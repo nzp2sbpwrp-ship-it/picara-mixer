@@ -1,0 +1,4405 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="googlebot" content="noindex, nofollow, noarchive">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="ピカラ Color Mixer">
+<meta name="theme-color" content="#f4f6f9">
+<title>ピカラ 実測学習型ミキサー</title>
+<style>
+  :root {
+    --bg-main: #f4f6f9;
+    --card-bg: #ffffff;
+    --text-main: #1e293b;
+    --border-color: #cbd5e1;
+    --primary: #3b82f6;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background-color: var(--bg-main);
+    color: var(--text-main);
+    margin: 0;
+    padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    display: flex;
+    justify-content: center;
+  }
+
+  .container { width: 100%; max-width: 500px; }
+  h1 { font-size: 1.3rem; text-align: center; margin-bottom: 4px; color: #0f172a; font-weight: 800; letter-spacing: 0.05em; }
+  .subtitle { text-align: center; font-size: 0.8rem; color: #64748b; margin-bottom: 16px; }
+  .card { background: var(--card-bg); border-radius: 16px; padding: 18px; margin-bottom: 16px; box-shadow: 0 4px 20px rgba(15, 23, 42, 0.05); border: 1px solid #e2e8f0; }
+  .card-title { font-size: 0.95rem; font-weight: bold; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; color: #475569; border-left: 4px solid var(--primary); padding-left: 8px; }
+  .range-group { display: flex; align-items: center; gap: 12px; }
+  .range-group input[type="range"] { flex: 1; height: 6px; background: #e2e8f0; border-radius: 3px; appearance: none; outline: none; }
+  .range-group input[type="range"]::-webkit-slider-thumb { appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--primary); cursor: pointer; }
+  .level-badge { background: #1e293b; color: white; padding: 6px 10px; border-radius: 8px; font-weight: bold; min-width: 75px; text-align: center; font-size: 0.8rem; }
+  .mix-list { display: flex; flex-direction: column; gap: 10px; }
+  .mix-item { display: flex; align-items: center; gap: 8px; background: #f8fafc; padding: 8px 12px; border-radius: 12px; border: 1px solid #e2e8f0; }
+  .color-dot { width: 32px; height: 32px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.15); flex-shrink: 0; }
+  .color-name { flex: 1; font-weight: bold; font-size: 0.95rem; color: #334155; }
+  .volume-control { display: flex; align-items: center; gap: 6px; }
+  .volume-control input { width: 50px; padding: 6px 0; border: 1px solid var(--border-color); border-radius: 8px; text-align: center; font-size: 0.9rem; font-weight: bold; background: #fff; }
+  .btn-circle { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--border-color); background: white; cursor: pointer; font-weight: bold; display: flex; align-items: center; justify-content: center; color: #64748b; }
+  .btn-del { background: #fff5f5; color: #ef4444; border-color: #fee2e2; margin-left: 4px; }
+  .palette-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .palette-btn { border: 1px solid #e2e8f0; background: white; border-radius: 10px; padding: 8px 4px; cursor: pointer; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.02); display: flex; flex-direction: column; align-items: center; }
+  .palette-color { width: 100%; height: 28px; border-radius: 6px; margin-bottom: 6px; box-shadow: inset 0 1px 4px rgba(0,0,0,0.15); box-sizing: border-box; }
+  .palette-label { font-size: 0.75rem; font-weight: 700; color: #475569; }
+  .swatch-container { display: flex; gap: 12px; margin-bottom: 16px; }
+  .swatch-box { flex: 1; height: 150px; border-radius: 14px; border: 1px solid var(--border-color); box-shadow: inset 0 4px 10px rgba(0,0,0,0.08); display: flex; flex-direction: column; justify-content: flex-end; padding: 10px; box-sizing: border-box; color: white; text-shadow: 0 2px 6px rgba(0,0,0,0.85); font-size: 0.8rem; font-weight: bold; }
+  .info-row { display: flex; justify-content: space-between; padding: 8px 4px; border-bottom: 1px dashed #e2e8f0; font-size: 0.9rem; }
+  .info-row:last-child { border: none; }
+  .source-badge { font-size: 0.75rem; color: #22c55e; background: #f0fdf4; padding: 2px 8px; border-radius: 4px; font-weight: normal; }
+  .selector-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .selector-btn { border: 1px solid #dbe3ee; background: #fff; border-radius: 8px; padding: 9px 6px; cursor: pointer; color: #334155; font-weight: 700; font-size: 0.78rem; }
+  .selector-btn.active { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(59,130,246,0.14); color: #1d4ed8; background: #eff6ff; }
+  .selector-step { margin-top: 16px; }
+  .selector-label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 9px; color: #475569; font-size: 0.82rem; font-weight: 700; }
+  .segment { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+  .generate-btn { width: 100%; margin-top: 18px; border: 0; border-radius: 8px; padding: 12px; background: #1d4ed8; color: #fff; font-size: 0.95rem; font-weight: 800; cursor: pointer; }
+  .selector-result { display: none; margin-top: 14px; padding-top: 14px; border-top: 1px solid #e2e8f0; }
+  .selector-result.visible { display: block; }
+  .result-recipe { font-size: 0.95rem; font-weight: 800; color: #0f172a; margin-bottom: 7px; }
+  .result-note { font-size: 0.78rem; line-height: 1.55; color: #64748b; }
+  .result-warning { margin-top: 8px; padding: 8px 10px; border-radius: 6px; color: #9a3412; background: #fff7ed; font-size: 0.76rem; font-weight: 700; }
+  .app-screen { display: none; }
+  .app-screen.active { display: block; }
+  .home-screen { padding-top: 14vh; }
+  .home-actions { display: grid; gap: 12px; margin-top: 26px; }
+  .home-btn { width: 100%; border: 1px solid #dbe3ee; border-radius: 8px; padding: 18px; background: #fff; color: #0f172a; cursor: pointer; text-align: left; }
+  .home-btn.primary { border-color: #2563eb; background: #2563eb; color: #fff; }
+  .home-btn-title { display: block; font-size: 1rem; font-weight: 800; margin-bottom: 4px; }
+  .home-btn-note { display: block; font-size: 0.76rem; line-height: 1.5; opacity: 0.76; }
+  .screen-header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .back-btn { width: 36px; height: 36px; border: 1px solid #dbe3ee; border-radius: 8px; background: #fff; color: #334155; cursor: pointer; font-size: 1.1rem; }
+  .screen-title { font-size: 1.05rem; font-weight: 800; color: #0f172a; }
+  .result-swatch { height: 120px; margin-top: 12px; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; box-sizing: border-box; display: flex; align-items: flex-end; color: #fff; text-shadow: 0 2px 5px rgba(0,0,0,.8); font-size: .8rem; font-weight: 800; }
+  .secondary-btn { width: 100%; margin-top: 10px; border: 1px solid #2563eb; border-radius: 8px; padding: 11px; background: #fff; color: #1d4ed8; font-size: .9rem; font-weight: 800; cursor: pointer; }
+  .photo-input { display: none; }
+  .photo-upload { display: block; width: 100%; border: 1px dashed #94a3b8; border-radius: 8px; padding: 14px; box-sizing: border-box; background: #f8fafc; color: #334155; text-align: center; font-weight: 800; cursor: pointer; }
+  .photo-stage { display: none; position: relative; margin-top: 12px; overflow: hidden; border-radius: 8px; background: #e2e8f0; }
+  .photo-stage.visible { display: block; }
+  #photoCanvas { display: block; width: 100%; height: auto; touch-action: none; cursor: crosshair; }
+  .sample-summary { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding: 10px; border-radius: 8px; background: #f8fafc; }
+  .sample-swatch { width: 46px; height: 46px; border-radius: 8px; border: 1px solid #cbd5e1; flex: none; }
+  .sample-meta { flex: 1; font-size: .78rem; color: #64748b; line-height: 1.5; }
+  .sample-meta strong { display: block; color: #0f172a; font-size: .9rem; }
+  .inline-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+  .small-btn { border: 1px solid #cbd5e1; border-radius: 8px; padding: 9px; background: #fff; color: #334155; font-weight: 700; cursor: pointer; }
+  .reverse-results { display: grid; gap: 9px; margin-top: 14px; }
+  .reverse-card { display: grid; grid-template-columns: 52px 1fr auto; gap: 10px; align-items: center; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; }
+  .reverse-swatch { width: 52px; height: 52px; border-radius: 7px; border: 1px solid #cbd5e1; }
+  .reverse-recipe { font-size: .85rem; font-weight: 800; color: #0f172a; }
+  .reverse-detail { margin-top: 3px; color: #64748b; font-size: .72rem; }
+  .use-recipe-btn { border: 1px solid #2563eb; border-radius: 7px; padding: 8px 9px; color: #1d4ed8; background: #fff; font-weight: 800; cursor: pointer; }
+  .photo-note { margin-top: 9px; color: #64748b; font-size: .74rem; line-height: 1.55; }
+  .target-modes { display: grid; gap: 7px; margin-top: 12px; }
+  .target-mode-btn { display: grid; grid-template-columns: 28px 1fr auto; gap: 8px; align-items: center; width: 100%; border: 1px solid #dbe3ee; border-radius: 8px; padding: 9px; background: #fff; color: #334155; text-align: left; cursor: pointer; }
+  .target-mode-btn.active { border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,.12); }
+  .mode-swatch { width: 28px; height: 28px; border: 1px solid #cbd5e1; border-radius: 6px; }
+  .mode-name { font-size: .78rem; font-weight: 800; }
+  .mode-hex { font-size: .74rem; color: #64748b; font-weight: 700; }
+  .manual-color-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 8px; }
+  .manual-color-row input { min-width: 0; border: 1px solid #cbd5e1; border-radius: 8px; padding: 9px 10px; font-size: .85rem; text-transform: uppercase; }
+
+  .base-tone-display { display: flex; flex-direction: column; align-items: stretch; gap: 9px; margin-bottom: 14px; padding: 12px; border-radius: 14px; background: #f8fafc; border: 1px solid #e2e8f0; }
+  .base-tone-swatch { width: 100%; height: clamp(86px, 24vw, 120px); border-radius: 12px; border: 1px solid #cbd5e1; box-shadow: inset 0 4px 12px rgba(0,0,0,.18), 0 2px 8px rgba(15,23,42,.06); flex: none; }
+  .base-tone-text { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: .78rem; color: #64748b; line-height: 1.35; }
+  .base-tone-text strong { display: block; font-size: 1.08rem; color: #0f172a; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <section id="homeScreen" class="app-screen home-screen active">
+    <h1>ピカラ Color Selector</h1>
+    <div class="subtitle">目的に合わせてモードを選択</div>
+    <div class="home-actions">
+      <button id="openPhotoBtn" class="home-btn primary">
+        <span class="home-btn-title">写真の色からレシピを探す</span>
+        <span class="home-btn-note">写真から目標色を取得し、近いピカラ配合を逆引き</span>
+      </button>
+      <button id="openMixerBtn" class="home-btn">
+        <span class="home-btn-title">自由に色を混ぜる</span>
+        <span class="home-btn-note">カラーと配合量を自由に設定して仕上がりを確認</span>
+      </button>
+    </div>
+  </section>
+
+  <section id="photoScreen" class="app-screen">
+    <div class="screen-header">
+      <button class="back-btn" data-screen="homeScreen" aria-label="戻る">‹</button>
+      <div class="screen-title">写真からレシピを逆引き</div>
+    </div>
+    <div class="card">
+      <div class="card-title">目標の髪色を選択</div>
+      <label class="photo-upload" for="photoInput">写真を選ぶ</label>
+      <input id="photoInput" class="photo-input" type="file" accept="image/*">
+      <div id="photoStage" class="photo-stage">
+        <canvas id="photoCanvas"></canvas>
+      </div>
+      <div class="photo-note">髪の中間部分など、光と影が強くない場所を3〜5か所タップしてください。</div>
+      <div class="sample-summary">
+        <div id="targetColorSwatch" class="sample-swatch"></div>
+        <div class="sample-meta">
+          <strong id="targetColorHex">未選択</strong>
+          <span id="sampleCount">選択点 0</span>
+        </div>
+      </div>
+      <div class="inline-actions">
+        <button id="undoSampleBtn" class="small-btn">1点戻す</button>
+        <button id="clearSamplesBtn" class="small-btn">選択をクリア</button>
+      </div>
+      <div class="target-modes">
+        <button id="rawTargetBtn" class="target-mode-btn active" data-target-mode="raw">
+          <span id="rawModeSwatch" class="mode-swatch"></span>
+          <span class="mode-name">そのまま抽出</span>
+          <span id="rawModeHex" class="mode-hex">—</span>
+        </button>
+        <button id="filteredTargetBtn" class="target-mode-btn" data-target-mode="filtered">
+          <span id="filteredModeSwatch" class="mode-swatch"></span>
+          <span class="mode-name">影・反射を除く（色味保持）</span>
+          <span id="filteredModeHex" class="mode-hex">5点以上で算出</span>
+        </button>
+      </div>
+      <div class="manual-color-row">
+        <input id="manualTargetHex" type="text" inputmode="text" maxlength="7" placeholder="#3A3331">
+        <button id="applyManualTargetBtn" class="small-btn">手入力を使う</button>
+      </div>
+      <div class="selector-step">
+        <div class="selector-label"><span>明るさだけ微調整</span><span id="photoLightnessLabel">0</span></div>
+        <div class="range-group">
+          <input id="photoLightnessRange" type="range" min="-20" max="20" value="0">
+        </div>
+      </div>
+      <div class="photo-note">影・反射補正は色相と彩度を変えず、明るさの外れ値だけを除きます。補正候補へ自動で切り替わることはありません。</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">染める前のベース</div>
+      <div class="base-tone-display">
+        <div id="photoBaseSwatch" class="base-tone-swatch"></div>
+        <div class="base-tone-text"><strong id="photoBaseBadgeMirror">ベース色</strong><span>選択中の明るさイメージ</span></div>
+      </div>
+      <div class="range-group">
+        <input type="range" id="photoBaseRange" min="5" max="20" value="14">
+        <div id="photoBaseBadge" class="level-badge">Lv.14</div>
+      </div>
+      <button id="searchRecipesBtn" class="generate-btn">近いピカラレシピを検索</button>
+      <div class="photo-note">単色と2色配合（4:1〜1:4）を検索します。表示色は現在の色混ぜ計算に基づく予測です。</div>
+      <div id="reverseResults" class="reverse-results"></div>
+    </div>
+  </section>
+
+  <section id="selectorScreen" class="app-screen">
+    <div class="screen-header">
+      <button class="back-btn" data-screen="homeScreen" aria-label="戻る">‹</button>
+      <div class="screen-title">かんたんレシピ選定</div>
+    </div>
+  <div class="card">
+    <div class="card-title">かんたんレシピ選定</div>
+    <div class="selector-label"><span>1. 作りたい色</span><span id="targetHueLabel">グレージュ</span></div>
+    <div id="targetHueGrid" class="selector-grid">
+      <button class="selector-btn" data-hue="ash">アッシュ</button>
+      <button class="selector-btn active" data-hue="greige">グレージュ</button>
+      <button class="selector-btn" data-hue="beige">ベージュ</button>
+      <button class="selector-btn" data-hue="pink">ピンク</button>
+      <button class="selector-btn" data-hue="red">レッド</button>
+      <button class="selector-btn" data-hue="orange">オレンジ</button>
+      <button class="selector-btn" data-hue="violet">バイオレット</button>
+      <button class="selector-btn" data-hue="blue">ブルー</button>
+      <button class="selector-btn" data-hue="green">グリーン</button>
+    </div>
+
+    <div class="selector-step">
+      <div class="selector-label"><span>2. 現在のベース明度</span><span id="selectorBaseLevelBadge">Lv.10</span></div>
+      <div class="base-tone-display">
+        <div id="selectorBaseSwatch" class="base-tone-swatch"></div>
+        <div class="base-tone-text"><strong id="selectorBaseBadgeMirror">ベース色</strong><span>選択中の明るさイメージ</span></div>
+      </div>
+      <div class="range-group">
+        <input type="range" id="selectorBaseRange" min="5" max="20" value="10">
+      </div>
+    </div>
+
+    <div class="selector-step">
+      <div class="selector-label"><span>3. 希望する仕上がり明度</span><span id="targetLevelBadge">Lv.10</span></div>
+      <div class="range-group">
+        <input type="range" id="targetLevelRange" min="3" max="20" value="10">
+      </div>
+    </div>
+
+    <div class="selector-step">
+      <div class="selector-label"><span>4. ベースの明度差</span><span id="unevenLabel">小</span></div>
+      <div id="unevenGroup" class="segment">
+        <button class="selector-btn active" data-uneven="low">小</button>
+        <button class="selector-btn" data-uneven="medium">中</button>
+        <button class="selector-btn" data-uneven="high">大</button>
+      </div>
+    </div>
+
+    <button id="generateRecipeBtn" class="generate-btn">ピカラレシピを作成</button>
+    <div id="selectorResult" class="selector-result">
+      <div id="selectorRecipe" class="result-recipe"></div>
+      <div id="selectorNote" class="result-note"></div>
+      <div id="selectorSwatch" class="result-swatch">予想仕上がり</div>
+      <div id="selectorWarning" class="result-warning"></div>
+      <button id="editInMixerBtn" class="secondary-btn">ミキサーで配合を調整</button>
+    </div>
+  </div>
+  </section>
+
+  <section id="mixerScreen" class="app-screen">
+  <div class="screen-header">
+    <button class="back-btn" data-screen="homeScreen" aria-label="戻る">‹</button>
+    <div class="screen-title">自由に色を混ぜる</div>
+  </div>
+  <div class="card">
+    <div class="card-title">現在の髪のベーストーン</div>
+    <div class="base-tone-display">
+      <div id="baseToneSwatch" class="base-tone-swatch"></div>
+      <div class="base-tone-text"><strong id="baseToneMirror">ベース色</strong><span>選択中の明るさイメージ</span></div>
+    </div>
+    <div class="range-group">
+      <input type="range" id="baseRange" min="5" max="20" value="10">
+      <div id="levelBadge" class="level-badge">Lv.10</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🔬 調合結果（再現カラー）</div>
+    <div class="swatch-container">
+      <div id="swatchAgent" class="swatch-box">Lv20に染めた基準色</div>
+      <div id="swatchFinal" class="swatch-box">選択ベースの仕上がり</div>
+    </div>
+    <div class="info-row"><span>総量</span><strong id="outTotal">0 g</strong></div>
+    <div class="info-row"><span>仕上がり HEX</span><strong id="outHex">—</strong></div>
+    <div class="info-row"><span>調合比率レシピ</span><strong id="outRatio">—</strong></div>
+    <div class="info-row"><span>計算ソース</span><span id="outSource" class="source-badge">—</span></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📋 現在の配合比率</div>
+    <div id="mixList" class="mix-list"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">＋ タップしてカラーをレシピに追加</div>
+    <div id="palette" class="palette-grid"></div>
+  </div>
+  </section>
+</div>
+
+<script>
+// 色データは data/*.json から読み込み。
+let picaraColors = {};
+let baseLevelColors = {};
+let singleColorResults = {};
+let realMixData = {};
+
+async function loadPicaraData() {
+  const cacheBust = Date.now();
+  const [colorsRes, singleRes, mixRes] = await Promise.all([
+    fetch(`data/colors.json?v=${cacheBust}`),
+    fetch(`data/singleColorResults.json?v=${cacheBust}`),
+    fetch(`data/realMixData.json?v=${cacheBust}`)
+  ]);
+
+  if (!colorsRes.ok || !singleRes.ok || !mixRes.ok) {
+    throw new Error("色データJSONの読み込みに失敗しました");
+  }
+
+  const colorsData = await colorsRes.json();
+  picaraColors = colorsData.picaraColors || {};
+  baseLevelColors = colorsData.baseLevelColors || {};
+  singleColorResults = await singleRes.json();
+  realMixData = await mixRes.json();
+}
+
+function normalizeBaseLevel(value) {
+  const lv = Number(value);
+  return lv <= 5 ? 5 : lv;
+}
+
+function baseLevelLabel(value) {
+  const lv = normalizeBaseLevel(value);
+  return lv === 5 ? "暗髪" : `Lv.${lv}`;
+}
+
+function updateBaseToneDisplay(rangeId, badgeId, swatchId) {
+  const range = document.getElementById(rangeId);
+  if (!range) return;
+  const lv = normalizeBaseLevel(range.value);
+  range.value = String(lv);
+  const badge = document.getElementById(badgeId);
+  if (badge) badge.textContent = baseLevelLabel(lv);
+  const swatch = document.getElementById(swatchId);
+  if (swatch) swatch.style.backgroundColor = baseLevelColors[lv] || "#ffffff";
+  const mirrorMap = {
+    baseToneSwatch: "baseToneMirror",
+    photoBaseSwatch: "photoBaseBadgeMirror",
+    selectorBaseSwatch: "selectorBaseBadgeMirror"
+  };
+  const mirror = document.getElementById(mirrorMap[swatchId]);
+  if (mirror) mirror.textContent = baseLevelLabel(lv);
+}
+
+function updateAllBaseToneDisplays() {
+  updateBaseToneDisplay("baseRange", "levelBadge", "baseToneSwatch");
+  updateBaseToneDisplay("photoBaseRange", "photoBaseBadge", "photoBaseSwatch");
+  updateBaseToneDisplay("selectorBaseRange", "selectorBaseLevelBadge", "selectorBaseSwatch");
+}
+
+// ベースの定義（20LVホワイトブリーチ基準）
+// スライダーの髪のアンダーベース
+// Excel「色マスター (2)」の確定単品結果。配列の0番目がLv1、19番目がLv20。
+// Clear・Pastel・11BKは単品マスターが空欄のため、ここには登録しない。
+// 単品マスターとは分離したOXY1倍の実測補正。
+// 実測ベースを標準Lvへ直置きせず、ベース明度に応じた染料効果として適用する。
+const singleColorCalibrations = {
+  "Green": {
+    darkBase: "#0C0C0C",
+    darkResult: "#13110F",
+    measuredBase: "#704831",
+    measuredResult: "#1F2725",
+    whiteBase: "#FFFFFF",
+    whiteResult: "#3A4D47",
+    source: "Green OXY1倍実測2点補正"
+  }
+};
+
+// 提供されたガチの「実測ミックスデータベース」
+// ※ユーザーがアップロードした全データを完全に格納
+const realMixDataSource = {
+  "11BK|9BR|Blue|#2A2424|1:2:1": "実測データ",
+  "11BK|9BR|Blue|#704831|1:2:1": "実測データ",
+  "11BK|9BR|Blue|#C6A981|1:2:1": "実測データ",
+  "11BK|9BR|Blue|Lv10|1:2:1": "実測データ",
+  "11BK|9BR|Blue|Lv14|1:2:1": "実測データ",
+  "11BK|9BR|Blue|Lv1|1:2:1": "実測データ",
+  "11BK|9BR|Green|#2A2424|1:2:1": "実測データ",
+  "11BK|9BR|Green|#704831|1:2:1": "実測データ",
+  "11BK|9BR|Green|#C6A981|1:2:1": "実測データ",
+  "11BK|9BR|Green|Lv10|1:2:1": "実測データ",
+  "11BK|9BR|Green|Lv14|1:2:1": "実測データ",
+  "11BK|9BR|Green|Lv1|1:2:1": "実測データ",
+  "11BK|Blue|#2A2424|1:1": "毛束データ入力",
+  "11BK|Blue|#2A2424|1:2": "毛束データ入力",
+  "11BK|Blue|#2A2424|1:3": "毛束データ入力",
+  "11BK|Blue|#2A2424|1:4": "毛束データ入力",
+  "11BK|Blue|#2A2424|2:1": "毛束データ入力",
+  "11BK|Blue|#2A2424|3:1": "毛束データ入力",
+  "11BK|Blue|#2A2424|4:1": "毛束データ入力",
+  "11BK|Blue|#704831|1:1": "毛束データ入力",
+  "11BK|Blue|#704831|1:2": "毛束データ入力",
+  "11BK|Blue|#704831|1:3": "毛束データ入力",
+  "11BK|Blue|#704831|1:4": "毛束データ入力",
+  "11BK|Blue|#704831|2:1": "毛束データ入力",
+  "11BK|Blue|#704831|3:1": "毛束データ入力",
+  "11BK|Blue|#704831|4:1": "毛束データ入力",
+  "11BK|Blue|#C6A981|1:1": "毛束データ入力",
+  "11BK|Blue|#C6A981|1:2": "毛束データ入力",
+  "11BK|Blue|#C6A981|1:3": "毛束データ入力",
+  "11BK|Blue|#C6A981|1:4": "毛束データ入力",
+  "11BK|Blue|#C6A981|2:1": "毛束データ入力",
+  "11BK|Blue|#C6A981|3:1": "毛束データ入力",
+  "11BK|Blue|#C6A981|4:1": "毛束データ入力",
+  "11BK|Blue|Lv10|1:1": "毛束データ入力",
+  "11BK|Blue|Lv10|1:2": "毛束データ入力",
+  "11BK|Blue|Lv10|1:3": "毛束データ入力",
+  "11BK|Blue|Lv10|1:4": "毛束データ入力",
+  "11BK|Blue|Lv10|2:1": "毛束データ入力",
+  "11BK|Blue|Lv10|3:1": "毛束データ入力",
+  "11BK|Blue|Lv10|4:1": "毛束データ入力",
+  "11BK|Blue|Lv14|1:1": "毛束データ入力",
+  "11BK|Blue|Lv14|1:2": "毛束データ入力",
+  "11BK|Blue|Lv14|1:3": "毛束データ入力",
+  "11BK|Blue|Lv14|1:4": "毛束データ入力",
+  "11BK|Blue|Lv14|2:1": "毛束データ入力",
+  "11BK|Blue|Lv14|3:1": "毛束データ入力",
+  "11BK|Blue|Lv14|4:1": "毛束データ入力",
+  "11BK|Blue|Lv1|1:1": "毛束データ入力",
+  "11BK|Blue|Lv1|1:2": "毛束データ入力",
+  "11BK|Blue|Lv1|1:3": "毛束データ入力",
+  "11BK|Blue|Lv1|1:4": "毛束データ入力",
+  "11BK|Blue|Lv1|2:1": "毛束データ入力",
+  "11BK|Blue|Lv1|3:1": "毛束データ入力",
+  "11BK|Blue|Lv1|4:1": "毛束データ入力",
+  "11BK|Cyan|#2A2424|1:1": "毛束データ入力",
+  "11BK|Cyan|#2A2424|1:2": "毛束データ入力",
+  "11BK|Cyan|#2A2424|1:3": "毛束データ入力",
+  "11BK|Cyan|#2A2424|1:4": "毛束データ入力",
+  "11BK|Cyan|#2A2424|2:1": "毛束データ入力",
+  "11BK|Cyan|#2A2424|3:1": "毛束データ入力",
+  "11BK|Cyan|#2A2424|4:1": "毛束データ入力",
+  "11BK|Cyan|#704831|1:1": "毛束データ入力",
+  "11BK|Cyan|#704831|1:2": "毛束データ入力",
+  "11BK|Cyan|#704831|1:3": "毛束データ入力",
+  "11BK|Cyan|#704831|1:4": "毛束データ入力",
+  "11BK|Cyan|#704831|2:1": "毛束データ入力",
+  "11BK|Cyan|#704831|3:1": "毛束データ入力",
+  "11BK|Cyan|#704831|4:1": "毛束データ入力",
+  "11BK|Cyan|#C6A981|1:1": "毛束データ入力",
+  "11BK|Cyan|#C6A981|1:2": "毛束データ入力",
+  "11BK|Cyan|#C6A981|1:3": "毛束データ入力",
+  "11BK|Cyan|#C6A981|1:4": "毛束データ入力",
+  "11BK|Cyan|#C6A981|2:1": "毛束データ入力",
+  "11BK|Cyan|#C6A981|3:1": "毛束データ入力",
+  "11BK|Cyan|#C6A981|4:1": "毛束データ入力",
+  "11BK|Cyan|Lv10|1:1": "毛束データ入力",
+  "11BK|Cyan|Lv10|1:2": "毛束データ入力",
+  "11BK|Cyan|Lv10|1:3": "毛束データ入力",
+  "11BK|Cyan|Lv10|1:4": "毛束データ入力",
+  "11BK|Cyan|Lv10|2:1": "毛束データ入力",
+  "11BK|Cyan|Lv10|3:1": "毛束データ入力",
+  "11BK|Cyan|Lv10|4:1": "毛束データ入力",
+  "11BK|Cyan|Lv14|1:1": "毛束データ入力",
+  "11BK|Cyan|Lv14|1:2": "毛束データ入力",
+  "11BK|Cyan|Lv14|1:3": "毛束データ入力",
+  "11BK|Cyan|Lv14|1:4": "毛束データ入力",
+  "11BK|Cyan|Lv14|2:1": "毛束データ入力",
+  "11BK|Cyan|Lv14|3:1": "毛束データ入力",
+  "11BK|Cyan|Lv14|4:1": "毛束データ入力",
+  "11BK|Cyan|Lv1|1:1": "毛束データ入力",
+  "11BK|Cyan|Lv1|1:2": "毛束データ入力",
+  "11BK|Cyan|Lv1|1:3": "毛束データ入力",
+  "11BK|Cyan|Lv1|1:4": "毛束データ入力",
+  "11BK|Cyan|Lv1|2:1": "毛束データ入力",
+  "11BK|Cyan|Lv1|3:1": "毛束データ入力",
+  "11BK|Cyan|Lv1|4:1": "毛束データ入力",
+  "11BK|FPink|#2A2424|1:1": "毛束データ入力",
+  "11BK|FPink|#2A2424|1:2": "毛束データ入力",
+  "11BK|FPink|#2A2424|1:3": "毛束データ入力",
+  "11BK|FPink|#2A2424|1:4": "毛束データ入力",
+  "11BK|FPink|#2A2424|2:1": "毛束データ入力",
+  "11BK|FPink|#2A2424|3:1": "毛束データ入力",
+  "11BK|FPink|#2A2424|4:1": "毛束データ入力",
+  "11BK|FPink|#704831|1:1": "毛束データ入力",
+  "11BK|FPink|#704831|1:2": "毛束データ入力",
+  "11BK|FPink|#704831|1:3": "毛束データ入力",
+  "11BK|FPink|#704831|1:4": "毛束データ入力",
+  "11BK|FPink|#704831|2:1": "毛束データ入力",
+  "11BK|FPink|#704831|3:1": "毛束データ入力",
+  "11BK|FPink|#704831|4:1": "毛束データ入力",
+  "11BK|FPink|#C6A981|1:1": "毛束データ入力",
+  "11BK|FPink|#C6A981|1:2": "毛束データ入力",
+  "11BK|FPink|#C6A981|1:3": "毛束データ入力",
+  "11BK|FPink|#C6A981|1:4": "毛束データ入力",
+  "11BK|FPink|#C6A981|2:1": "毛束データ入力",
+  "11BK|FPink|#C6A981|3:1": "毛束データ入力",
+  "11BK|FPink|#C6A981|4:1": "毛束データ入力",
+  "11BK|FPink|Lv10|1:1": "毛束データ入力",
+  "11BK|FPink|Lv10|1:2": "毛束データ入力",
+  "11BK|FPink|Lv10|1:3": "毛束データ入力",
+  "11BK|FPink|Lv10|1:4": "毛束データ入力",
+  "11BK|FPink|Lv10|2:1": "毛束データ入力",
+  "11BK|FPink|Lv10|3:1": "毛束データ入力",
+  "11BK|FPink|Lv10|4:1": "毛束データ入力",
+  "11BK|FPink|Lv14|1:1": "毛束データ入力",
+  "11BK|FPink|Lv14|1:2": "毛束データ入力",
+  "11BK|FPink|Lv14|1:3": "毛束データ入力",
+  "11BK|FPink|Lv14|1:4": "毛束データ入力",
+  "11BK|FPink|Lv14|2:1": "毛束データ入力",
+  "11BK|FPink|Lv14|3:1": "毛束データ入力",
+  "11BK|FPink|Lv14|4:1": "毛束データ入力",
+  "11BK|FPink|Lv1|1:1": "毛束データ入力",
+  "11BK|FPink|Lv1|1:2": "毛束データ入力",
+  "11BK|FPink|Lv1|1:3": "毛束データ入力",
+  "11BK|FPink|Lv1|1:4": "毛束データ入力",
+  "11BK|FPink|Lv1|2:1": "毛束データ入力",
+  "11BK|FPink|Lv1|3:1": "毛束データ入力",
+  "11BK|FPink|Lv1|4:1": "毛束データ入力",
+  "11BK|Gold|#2A2424|1:1": "毛束データ入力",
+  "11BK|Gold|#2A2424|1:2": "毛束データ入力",
+  "11BK|Gold|#2A2424|1:3": "毛束データ入力",
+  "11BK|Gold|#2A2424|1:4": "毛束データ入力",
+  "11BK|Gold|#2A2424|2:1": "毛束データ入力",
+  "11BK|Gold|#2A2424|3:1": "毛束データ入力",
+  "11BK|Gold|#2A2424|4:1": "毛束データ入力",
+  "11BK|Gold|#704831|1:1": "毛束データ入力",
+  "11BK|Gold|#704831|1:2": "毛束データ入力",
+  "11BK|Gold|#704831|1:3": "毛束データ入力",
+  "11BK|Gold|#704831|1:4": "毛束データ入力",
+  "11BK|Gold|#704831|2:1": "毛束データ入力",
+  "11BK|Gold|#704831|3:1": "毛束データ入力",
+  "11BK|Gold|#704831|4:1": "毛束データ入力",
+  "11BK|Gold|#C6A981|1:1": "毛束データ入力",
+  "11BK|Gold|#C6A981|1:2": "毛束データ入力",
+  "11BK|Gold|#C6A981|1:3": "毛束データ入力",
+  "11BK|Gold|#C6A981|1:4": "毛束データ入力",
+  "11BK|Gold|#C6A981|2:1": "毛束データ入力",
+  "11BK|Gold|#C6A981|3:1": "毛束データ入力",
+  "11BK|Gold|#C6A981|4:1": "毛束データ入力",
+  "11BK|Gold|Lv10|1:1": "毛束データ入力",
+  "11BK|Gold|Lv10|1:2": "毛束データ入力",
+  "11BK|Gold|Lv10|1:3": "毛束データ入力",
+  "11BK|Gold|Lv10|1:4": "毛束データ入力",
+  "11BK|Gold|Lv10|2:1": "毛束データ入力",
+  "11BK|Gold|Lv10|3:1": "毛束データ入力",
+  "11BK|Gold|Lv10|4:1": "毛束データ入力",
+  "11BK|Gold|Lv14|1:1": "毛束データ入力",
+  "11BK|Gold|Lv14|1:2": "毛束データ入力",
+  "11BK|Gold|Lv14|1:3": "毛束データ入力",
+  "11BK|Gold|Lv14|1:4": "毛束データ入力",
+  "11BK|Gold|Lv14|2:1": "毛束データ入力",
+  "11BK|Gold|Lv14|3:1": "毛束データ入力",
+  "11BK|Gold|Lv14|4:1": "毛束データ入力",
+  "11BK|Gold|Lv1|1:1": "毛束データ入力",
+  "11BK|Gold|Lv1|1:2": "毛束データ入力",
+  "11BK|Gold|Lv1|1:3": "毛束データ入力",
+  "11BK|Gold|Lv1|1:4": "毛束データ入力",
+  "11BK|Gold|Lv1|2:1": "毛束データ入力",
+  "11BK|Gold|Lv1|3:1": "毛束データ入力",
+  "11BK|Gold|Lv1|4:1": "毛束データ入力",
+  "11BK|Green|#2A2424|1:1": "毛束データ入力",
+  "11BK|Green|#2A2424|1:2": "毛束データ入力",
+  "11BK|Green|#2A2424|1:3": "毛束データ入力",
+  "11BK|Green|#2A2424|1:4": "毛束データ入力",
+  "11BK|Green|#2A2424|2:1": "毛束データ入力",
+  "11BK|Green|#2A2424|3:1": "毛束データ入力",
+  "11BK|Green|#2A2424|4:1": "毛束データ入力",
+  "11BK|Green|#704831|1:1": "毛束データ入力",
+  "11BK|Green|#704831|1:2": "毛束データ入力",
+  "11BK|Green|#704831|1:3": "毛束データ入力",
+  "11BK|Green|#704831|1:4": "毛束データ入力",
+  "11BK|Green|#704831|2:1": "毛束データ入力",
+  "11BK|Green|#704831|3:1": "毛束データ入力",
+  "11BK|Green|#704831|4:1": "毛束データ入力",
+  "11BK|Green|#C6A981|1:1": "毛束データ入力",
+  "11BK|Green|#C6A981|1:2": "毛束データ入力",
+  "11BK|Green|#C6A981|1:3": "毛束データ入力",
+  "11BK|Green|#C6A981|1:4": "毛束データ入力",
+  "11BK|Green|#C6A981|2:1": "毛束データ入力",
+  "11BK|Green|#C6A981|3:1": "毛束データ入力",
+  "11BK|Green|#C6A981|4:1": "毛束データ入力",
+  "11BK|Green|Lv10|1:1": "毛束データ入力",
+  "11BK|Green|Lv10|1:2": "毛束データ入力",
+  "11BK|Green|Lv10|1:3": "毛束データ入力",
+  "11BK|Green|Lv10|1:4": "毛束データ入力",
+  "11BK|Green|Lv10|2:1": "毛束データ入力",
+  "11BK|Green|Lv10|3:1": "毛束データ入力",
+  "11BK|Green|Lv10|4:1": "毛束データ入力",
+  "11BK|Green|Lv14|1:1": "毛束データ入力",
+  "11BK|Green|Lv14|1:2": "毛束データ入力",
+  "11BK|Green|Lv14|1:3": "毛束データ入力",
+  "11BK|Green|Lv14|1:4": "毛束データ入力",
+  "11BK|Green|Lv14|2:1": "毛束データ入力",
+  "11BK|Green|Lv14|3:1": "毛束データ入力",
+  "11BK|Green|Lv14|4:1": "毛束データ入力",
+  "11BK|Green|Lv1|1:1": "毛束データ入力",
+  "11BK|Green|Lv1|1:2": "毛束データ入力",
+  "11BK|Green|Lv1|1:3": "毛束データ入力",
+  "11BK|Green|Lv1|1:4": "毛束データ入力",
+  "11BK|Green|Lv1|2:1": "毛束データ入力",
+  "11BK|Green|Lv1|3:1": "毛束データ入力",
+  "11BK|Green|Lv1|4:1": "毛束データ入力",
+  "11BK|Lapis|#2A2424|1:1": "毛束データ入力",
+  "11BK|Lapis|#2A2424|1:2": "毛束データ入力",
+  "11BK|Lapis|#2A2424|1:3": "毛束データ入力",
+  "11BK|Lapis|#2A2424|1:4": "毛束データ入力",
+  "11BK|Lapis|#2A2424|2:1": "毛束データ入力",
+  "11BK|Lapis|#2A2424|3:1": "毛束データ入力",
+  "11BK|Lapis|#2A2424|4:1": "毛束データ入力",
+  "11BK|Lapis|#704831|1:1": "毛束データ入力",
+  "11BK|Lapis|#704831|1:2": "毛束データ入力",
+  "11BK|Lapis|#704831|1:3": "毛束データ入力",
+  "11BK|Lapis|#704831|1:4": "毛束データ入力",
+  "11BK|Lapis|#704831|2:1": "毛束データ入力",
+  "11BK|Lapis|#704831|3:1": "毛束データ入力",
+  "11BK|Lapis|#704831|4:1": "毛束データ入力",
+  "11BK|Lapis|#C6A981|1:1": "毛束データ入力",
+  "11BK|Lapis|#C6A981|1:2": "毛束データ入力",
+  "11BK|Lapis|#C6A981|1:3": "毛束データ入力",
+  "11BK|Lapis|#C6A981|1:4": "毛束データ入力",
+  "11BK|Lapis|#C6A981|2:1": "毛束データ入力",
+  "11BK|Lapis|#C6A981|3:1": "毛束データ入力",
+  "11BK|Lapis|#C6A981|4:1": "毛束データ入力",
+  "11BK|Lapis|Lv10|1:1": "毛束データ入力",
+  "11BK|Lapis|Lv10|1:2": "毛束データ入力",
+  "11BK|Lapis|Lv10|1:3": "毛束データ入力",
+  "11BK|Lapis|Lv10|1:4": "毛束データ入力",
+  "11BK|Lapis|Lv10|2:1": "毛束データ入力",
+  "11BK|Lapis|Lv10|3:1": "毛束データ入力",
+  "11BK|Lapis|Lv10|4:1": "毛束データ入力",
+  "11BK|Lapis|Lv14|1:1": "毛束データ入力",
+  "11BK|Lapis|Lv14|1:2": "毛束データ入力",
+  "11BK|Lapis|Lv14|1:3": "毛束データ入力",
+  "11BK|Lapis|Lv14|1:4": "毛束データ入力",
+  "11BK|Lapis|Lv14|2:1": "毛束データ入力",
+  "11BK|Lapis|Lv14|3:1": "毛束データ入力",
+  "11BK|Lapis|Lv14|4:1": "毛束データ入力",
+  "11BK|Lapis|Lv1|1:1": "毛束データ入力",
+  "11BK|Lapis|Lv1|1:2": "毛束データ入力",
+  "11BK|Lapis|Lv1|1:3": "毛束データ入力",
+  "11BK|Lapis|Lv1|1:4": "毛束データ入力",
+  "11BK|Lapis|Lv1|2:1": "毛束データ入力",
+  "11BK|Lapis|Lv1|3:1": "毛束データ入力",
+  "11BK|Lapis|Lv1|4:1": "毛束データ入力",
+  "11BK|Orange|#2A2424|1:1": "毛束データ入力",
+  "11BK|Orange|#2A2424|1:2": "毛束データ入力",
+  "11BK|Orange|#2A2424|1:3": "毛束データ入力",
+  "11BK|Orange|#2A2424|1:4": "毛束データ入力",
+  "11BK|Orange|#2A2424|2:1": "毛束データ入力",
+  "11BK|Orange|#2A2424|3:1": "毛束データ入力",
+  "11BK|Orange|#2A2424|4:1": "毛束データ入力",
+  "11BK|Orange|#704831|1:1": "毛束データ入力",
+  "11BK|Orange|#704831|1:2": "毛束データ入力",
+  "11BK|Orange|#704831|1:3": "毛束データ入力",
+  "11BK|Orange|#704831|1:4": "毛束データ入力",
+  "11BK|Orange|#704831|2:1": "毛束データ入力",
+  "11BK|Orange|#704831|3:1": "毛束データ入力",
+  "11BK|Orange|#704831|4:1": "毛束データ入力",
+  "11BK|Orange|#C6A981|1:1": "毛束データ入力",
+  "11BK|Orange|#C6A981|1:2": "毛束データ入力",
+  "11BK|Orange|#C6A981|1:3": "毛束データ入力",
+  "11BK|Orange|#C6A981|1:4": "毛束データ入力",
+  "11BK|Orange|#C6A981|2:1": "毛束データ入力",
+  "11BK|Orange|#C6A981|3:1": "毛束データ入力",
+  "11BK|Orange|#C6A981|4:1": "毛束データ入力",
+  "11BK|Orange|Lv10|1:1": "毛束データ入力",
+  "11BK|Orange|Lv10|1:2": "毛束データ入力",
+  "11BK|Orange|Lv10|1:3": "毛束データ入力",
+  "11BK|Orange|Lv10|1:4": "毛束データ入力",
+  "11BK|Orange|Lv10|2:1": "毛束データ入力",
+  "11BK|Orange|Lv10|3:1": "毛束データ入力",
+  "11BK|Orange|Lv10|4:1": "毛束データ入力",
+  "11BK|Orange|Lv14|1:1": "毛束データ入力",
+  "11BK|Orange|Lv14|1:2": "毛束データ入力",
+  "11BK|Orange|Lv14|1:3": "毛束データ入力",
+  "11BK|Orange|Lv14|1:4": "毛束データ入力",
+  "11BK|Orange|Lv14|2:1": "毛束データ入力",
+  "11BK|Orange|Lv14|3:1": "毛束データ入力",
+  "11BK|Orange|Lv14|4:1": "毛束データ入力",
+  "11BK|Orange|Lv1|1:1": "毛束データ入力",
+  "11BK|Orange|Lv1|1:2": "毛束データ入力",
+  "11BK|Orange|Lv1|1:3": "毛束データ入力",
+  "11BK|Orange|Lv1|1:4": "毛束データ入力",
+  "11BK|Orange|Lv1|2:1": "毛束データ入力",
+  "11BK|Orange|Lv1|3:1": "毛束データ入力",
+  "11BK|Orange|Lv1|4:1": "毛束データ入力",
+  "11BK|Red|#2A2424|1:1": "毛束データ入力",
+  "11BK|Red|#2A2424|1:2": "毛束データ入力",
+  "11BK|Red|#2A2424|1:3": "毛束データ入力",
+  "11BK|Red|#2A2424|1:4": "毛束データ入力",
+  "11BK|Red|#2A2424|2:1": "毛束データ入力",
+  "11BK|Red|#2A2424|3:1": "毛束データ入力",
+  "11BK|Red|#2A2424|4:1": "毛束データ入力",
+  "11BK|Red|#704831|1:1": "毛束データ入力",
+  "11BK|Red|#704831|1:2": "毛束データ入力",
+  "11BK|Red|#704831|1:3": "毛束データ入力",
+  "11BK|Red|#704831|1:4": "毛束データ入力",
+  "11BK|Red|#704831|2:1": "毛束データ入力",
+  "11BK|Red|#704831|3:1": "毛束データ入力",
+  "11BK|Red|#704831|4:1": "毛束データ入力",
+  "11BK|Red|#C6A981|1:1": "毛束データ入力",
+  "11BK|Red|#C6A981|1:2": "毛束データ入力",
+  "11BK|Red|#C6A981|1:3": "毛束データ入力",
+  "11BK|Red|#C6A981|1:4": "毛束データ入力",
+  "11BK|Red|#C6A981|2:1": "毛束データ入力",
+  "11BK|Red|#C6A981|3:1": "毛束データ入力",
+  "11BK|Red|#C6A981|4:1": "毛束データ入力",
+  "11BK|Red|Lv10|1:1": "毛束データ入力",
+  "11BK|Red|Lv10|1:2": "毛束データ入力",
+  "11BK|Red|Lv10|1:3": "毛束データ入力",
+  "11BK|Red|Lv10|1:4": "毛束データ入力",
+  "11BK|Red|Lv10|2:1": "毛束データ入力",
+  "11BK|Red|Lv10|3:1": "毛束データ入力",
+  "11BK|Red|Lv10|4:1": "毛束データ入力",
+  "11BK|Red|Lv14|1:1": "毛束データ入力",
+  "11BK|Red|Lv14|1:2": "毛束データ入力",
+  "11BK|Red|Lv14|1:3": "毛束データ入力",
+  "11BK|Red|Lv14|1:4": "毛束データ入力",
+  "11BK|Red|Lv14|2:1": "毛束データ入力",
+  "11BK|Red|Lv14|3:1": "毛束データ入力",
+  "11BK|Red|Lv14|4:1": "毛束データ入力",
+  "11BK|Red|Lv1|1:1": "毛束データ入力",
+  "11BK|Red|Lv1|1:2": "毛束データ入力",
+  "11BK|Red|Lv1|1:3": "毛束データ入力",
+  "11BK|Red|Lv1|1:4": "毛束データ入力",
+  "11BK|Red|Lv1|2:1": "毛束データ入力",
+  "11BK|Red|Lv1|3:1": "毛束データ入力",
+  "11BK|Red|Lv1|4:1": "毛束データ入力",
+  "11BK|Violet|#2A2424|1:1": "毛束データ入力",
+  "11BK|Violet|#2A2424|1:2": "毛束データ入力",
+  "11BK|Violet|#2A2424|1:3": "毛束データ入力",
+  "11BK|Violet|#2A2424|1:4": "毛束データ入力",
+  "11BK|Violet|#2A2424|2:1": "毛束データ入力",
+  "11BK|Violet|#2A2424|3:1": "毛束データ入力",
+  "11BK|Violet|#2A2424|4:1": "毛束データ入力",
+  "11BK|Violet|#704831|1:1": "毛束データ入力",
+  "11BK|Violet|#704831|1:2": "毛束データ入力",
+  "11BK|Violet|#704831|1:3": "毛束データ入力",
+  "11BK|Violet|#704831|1:4": "毛束データ入力",
+  "11BK|Violet|#704831|2:1": "毛束データ入力",
+  "11BK|Violet|#704831|3:1": "毛束データ入力",
+  "11BK|Violet|#704831|4:1": "毛束データ入力",
+  "11BK|Violet|#C6A981|1:1": "毛束データ入力",
+  "11BK|Violet|#C6A981|1:2": "毛束データ入力",
+  "11BK|Violet|#C6A981|1:3": "毛束データ入力",
+  "11BK|Violet|#C6A981|1:4": "毛束データ入力",
+  "11BK|Violet|#C6A981|2:1": "毛束データ入力",
+  "11BK|Violet|#C6A981|3:1": "毛束データ入力",
+  "11BK|Violet|#C6A981|4:1": "毛束データ入力",
+  "11BK|Violet|Lv10|1:1": "毛束データ入力",
+  "11BK|Violet|Lv10|1:2": "毛束データ入力",
+  "11BK|Violet|Lv10|1:3": "毛束データ入力",
+  "11BK|Violet|Lv10|1:4": "毛束データ入力",
+  "11BK|Violet|Lv10|2:1": "毛束データ入力",
+  "11BK|Violet|Lv10|3:1": "毛束データ入力",
+  "11BK|Violet|Lv10|4:1": "毛束データ入力",
+  "11BK|Violet|Lv14|1:1": "毛束データ入力",
+  "11BK|Violet|Lv14|1:2": "毛束データ入力",
+  "11BK|Violet|Lv14|1:3": "毛束データ入力",
+  "11BK|Violet|Lv14|1:4": "毛束データ入力",
+  "11BK|Violet|Lv14|2:1": "毛束データ入力",
+  "11BK|Violet|Lv14|3:1": "毛束データ入力",
+  "11BK|Violet|Lv14|4:1": "毛束データ入力",
+  "11BK|Violet|Lv1|1:1": "毛束データ入力",
+  "11BK|Violet|Lv1|1:2": "毛束データ入力",
+  "11BK|Violet|Lv1|1:3": "毛束データ入力",
+  "11BK|Violet|Lv1|1:4": "毛束データ入力",
+  "11BK|Violet|Lv1|2:1": "毛束データ入力",
+  "11BK|Violet|Lv1|3:1": "毛束データ入力",
+  "11BK|Violet|Lv1|4:1": "毛束データ入力",
+  "3BK|Blue|#2A2424|1:1": "毛束データ入力",
+  "3BK|Blue|#2A2424|1:2": "毛束データ入力",
+  "3BK|Blue|#2A2424|1:3": "毛束データ入力",
+  "3BK|Blue|#2A2424|1:4": "毛束データ入力",
+  "3BK|Blue|#2A2424|2:1": "毛束データ入力",
+  "3BK|Blue|#2A2424|3:1": "毛束データ入力",
+  "3BK|Blue|#2A2424|4:1": "毛束データ入力",
+  "3BK|Blue|#704831|1:1": "毛束データ入力",
+  "3BK|Blue|#704831|1:2": "毛束データ入力",
+  "3BK|Blue|#704831|1:3": "毛束データ入力",
+  "3BK|Blue|#704831|1:4": "毛束データ入力",
+  "3BK|Blue|#704831|2:1": "毛束データ入力",
+  "3BK|Blue|#704831|3:1": "毛束データ入力",
+  "3BK|Blue|#704831|4:1": "毛束データ入力",
+  "3BK|Blue|#C6A981|1:1": "毛束データ入力",
+  "3BK|Blue|#C6A981|1:2": "毛束データ入力",
+  "3BK|Blue|#C6A981|1:3": "毛束データ入力",
+  "3BK|Blue|#C6A981|1:4": "毛束データ入力",
+  "3BK|Blue|#C6A981|2:1": "毛束データ入力",
+  "3BK|Blue|#C6A981|3:1": "毛束データ入力",
+  "3BK|Blue|#C6A981|4:1": "毛束データ入力",
+  "3BK|Blue|Lv10|1:1": "毛束データ入力",
+  "3BK|Blue|Lv10|1:2": "毛束データ入力",
+  "3BK|Blue|Lv10|1:3": "毛束データ入力",
+  "3BK|Blue|Lv10|1:4": "毛束データ入力",
+  "3BK|Blue|Lv10|2:1": "毛束データ入力",
+  "3BK|Blue|Lv10|3:1": "毛束データ入力",
+  "3BK|Blue|Lv10|4:1": "毛束データ入力",
+  "3BK|Blue|Lv14|1:1": "毛束データ入力",
+  "3BK|Blue|Lv14|1:2": "毛束データ入力",
+  "3BK|Blue|Lv14|1:3": "毛束データ入力",
+  "3BK|Blue|Lv14|1:4": "毛束データ入力",
+  "3BK|Blue|Lv14|2:1": "毛束データ入力",
+  "3BK|Blue|Lv14|3:1": "毛束データ入力",
+  "3BK|Blue|Lv14|4:1": "毛束データ入力",
+  "3BK|Blue|Lv1|1:1": "毛束データ入力",
+  "3BK|Blue|Lv1|1:2": "毛束データ入力",
+  "3BK|Blue|Lv1|1:3": "毛束データ入力",
+  "3BK|Blue|Lv1|1:4": "毛束データ入力",
+  "3BK|Blue|Lv1|2:1": "毛束データ入力",
+  "3BK|Blue|Lv1|3:1": "毛束データ入力",
+  "3BK|Blue|Lv1|4:1": "毛束データ入力",
+  "3BK|Cyan|#2A2424|1:1": "毛束データ入力",
+  "3BK|Cyan|#2A2424|1:2": "毛束データ入力",
+  "3BK|Cyan|#2A2424|1:3": "毛束データ入力",
+  "3BK|Cyan|#2A2424|1:4": "毛束データ入力",
+  "3BK|Cyan|#2A2424|2:1": "毛束データ入力",
+  "3BK|Cyan|#2A2424|3:1": "毛束データ入力",
+  "3BK|Cyan|#2A2424|4:1": "毛束データ入力",
+  "3BK|Cyan|#704831|1:1": "毛束データ入力",
+  "3BK|Cyan|#704831|1:2": "毛束データ入力",
+  "3BK|Cyan|#704831|1:3": "毛束データ入力",
+  "3BK|Cyan|#704831|1:4": "毛束データ入力",
+  "3BK|Cyan|#704831|2:1": "毛束データ入力",
+  "3BK|Cyan|#704831|3:1": "毛束データ入力",
+  "3BK|Cyan|#704831|4:1": "毛束データ入力",
+  "3BK|Cyan|#C6A981|1:1": "毛束データ入力",
+  "3BK|Cyan|#C6A981|1:2": "毛束データ入力",
+  "3BK|Cyan|#C6A981|1:3": "毛束データ入力",
+  "3BK|Cyan|#C6A981|1:4": "毛束データ入力",
+  "3BK|Cyan|#C6A981|2:1": "毛束データ入力",
+  "3BK|Cyan|#C6A981|3:1": "毛束データ入力",
+  "3BK|Cyan|#C6A981|4:1": "毛束データ入力",
+  "3BK|Cyan|Lv10|1:1": "毛束データ入力",
+  "3BK|Cyan|Lv10|1:2": "毛束データ入力",
+  "3BK|Cyan|Lv10|1:3": "毛束データ入力",
+  "3BK|Cyan|Lv10|1:4": "毛束データ入力",
+  "3BK|Cyan|Lv10|2:1": "毛束データ入力",
+  "3BK|Cyan|Lv10|3:1": "毛束データ入力",
+  "3BK|Cyan|Lv10|4:1": "毛束データ入力",
+  "3BK|Cyan|Lv14|1:1": "毛束データ入力",
+  "3BK|Cyan|Lv14|1:2": "毛束データ入力",
+  "3BK|Cyan|Lv14|1:3": "毛束データ入力",
+  "3BK|Cyan|Lv14|1:4": "毛束データ入力",
+  "3BK|Cyan|Lv14|2:1": "毛束データ入力",
+  "3BK|Cyan|Lv14|3:1": "毛束データ入力",
+  "3BK|Cyan|Lv14|4:1": "毛束データ入力",
+  "3BK|Cyan|Lv1|1:1": "毛束データ入力",
+  "3BK|Cyan|Lv1|1:2": "毛束データ入力",
+  "3BK|Cyan|Lv1|1:3": "毛束データ入力",
+  "3BK|Cyan|Lv1|1:4": "毛束データ入力",
+  "3BK|Cyan|Lv1|2:1": "毛束データ入力",
+  "3BK|Cyan|Lv1|3:1": "毛束データ入力",
+  "3BK|Cyan|Lv1|4:1": "毛束データ入力",
+  "3BK|FPink|#2A2424|1:1": "毛束データ入力",
+  "3BK|FPink|#2A2424|1:2": "毛束データ入力",
+  "3BK|FPink|#2A2424|1:3": "毛束データ入力",
+  "3BK|FPink|#2A2424|1:4": "毛束データ入力",
+  "3BK|FPink|#2A2424|2:1": "毛束データ入力",
+  "3BK|FPink|#2A2424|3:1": "毛束データ入力",
+  "3BK|FPink|#2A2424|4:1": "毛束データ入力",
+  "3BK|FPink|#704831|1:1": "毛束データ入力",
+  "3BK|FPink|#704831|1:2": "毛束データ入力",
+  "3BK|FPink|#704831|1:3": "毛束データ入力",
+  "3BK|FPink|#704831|1:4": "毛束データ入力",
+  "3BK|FPink|#704831|2:1": "毛束データ入力",
+  "3BK|FPink|#704831|3:1": "毛束データ入力",
+  "3BK|FPink|#704831|4:1": "毛束データ入力",
+  "3BK|FPink|#C6A981|1:1": "毛束データ入力",
+  "3BK|FPink|#C6A981|1:2": "毛束データ入力",
+  "3BK|FPink|#C6A981|1:3": "毛束データ入力",
+  "3BK|FPink|#C6A981|1:4": "毛束データ入力",
+  "3BK|FPink|#C6A981|2:1": "毛束データ入力",
+  "3BK|FPink|#C6A981|3:1": "毛束データ入力",
+  "3BK|FPink|#C6A981|4:1": "毛束データ入力",
+  "3BK|FPink|Lv10|1:1": "毛束データ入力",
+  "3BK|FPink|Lv10|1:2": "毛束データ入力",
+  "3BK|FPink|Lv10|1:3": "毛束データ入力",
+  "3BK|FPink|Lv10|1:4": "毛束データ入力",
+  "3BK|FPink|Lv10|2:1": "毛束データ入力",
+  "3BK|FPink|Lv10|3:1": "毛束データ入力",
+  "3BK|FPink|Lv10|4:1": "毛束データ入力",
+  "3BK|FPink|Lv14|1:1": "毛束データ入力",
+  "3BK|FPink|Lv14|1:2": "毛束データ入力",
+  "3BK|FPink|Lv14|1:3": "毛束データ入力",
+  "3BK|FPink|Lv14|1:4": "毛束データ入力",
+  "3BK|FPink|Lv14|2:1": "毛束データ入力",
+  "3BK|FPink|Lv14|3:1": "毛束データ入力",
+  "3BK|FPink|Lv14|4:1": "毛束データ入力",
+  "3BK|FPink|Lv1|1:1": "毛束データ入力",
+  "3BK|FPink|Lv1|1:2": "毛束データ入力",
+  "3BK|FPink|Lv1|1:3": "毛束データ入力",
+  "3BK|FPink|Lv1|1:4": "毛束データ入力",
+  "3BK|FPink|Lv1|2:1": "毛束データ入力",
+  "3BK|FPink|Lv1|3:1": "毛束データ入力",
+  "3BK|FPink|Lv1|4:1": "毛束データ入力",
+  "3BK|Gold|#2A2424|1:1": "毛束データ入力",
+  "3BK|Gold|#2A2424|1:2": "毛束データ入力",
+  "3BK|Gold|#2A2424|1:3": "毛束データ入力",
+  "3BK|Gold|#2A2424|1:4": "毛束データ入力",
+  "3BK|Gold|#2A2424|2:1": "毛束データ入力",
+  "3BK|Gold|#2A2424|3:1": "毛束データ入力",
+  "3BK|Gold|#2A2424|4:1": "毛束データ入力",
+  "3BK|Gold|#704831|1:1": "毛束データ入力",
+  "3BK|Gold|#704831|1:2": "毛束データ入力",
+  "3BK|Gold|#704831|1:3": "毛束データ入力",
+  "3BK|Gold|#704831|1:4": "毛束データ入力",
+  "3BK|Gold|#704831|2:1": "毛束データ入力",
+  "3BK|Gold|#704831|3:1": "毛束データ入力",
+  "3BK|Gold|#704831|4:1": "毛束データ入力",
+  "3BK|Gold|#C6A981|1:1": "毛束データ入力",
+  "3BK|Gold|#C6A981|1:2": "毛束データ入力",
+  "3BK|Gold|#C6A981|1:3": "毛束データ入力",
+  "3BK|Gold|#C6A981|1:4": "毛束データ入力",
+  "3BK|Gold|#C6A981|2:1": "毛束データ入力",
+  "3BK|Gold|#C6A981|3:1": "毛束データ入力",
+  "3BK|Gold|#C6A981|4:1": "毛束データ入力",
+  "3BK|Gold|Lv10|1:1": "毛束データ入力",
+  "3BK|Gold|Lv10|1:2": "毛束データ入力",
+  "3BK|Gold|Lv10|1:3": "毛束データ入力",
+  "3BK|Gold|Lv10|1:4": "毛束データ入力",
+  "3BK|Gold|Lv10|2:1": "毛束データ入力",
+  "3BK|Gold|Lv10|3:1": "毛束データ入力",
+  "3BK|Gold|Lv10|4:1": "毛束データ入力",
+  "3BK|Gold|Lv14|1:1": "毛束データ入力",
+  "3BK|Gold|Lv14|1:2": "毛束データ入力",
+  "3BK|Gold|Lv14|1:3": "毛束データ入力",
+  "3BK|Gold|Lv14|1:4": "毛束データ入力",
+  "3BK|Gold|Lv14|2:1": "毛束データ入力",
+  "3BK|Gold|Lv14|3:1": "毛束データ入力",
+  "3BK|Gold|Lv14|4:1": "毛束データ入力",
+  "3BK|Gold|Lv1|1:1": "毛束データ入力",
+  "3BK|Gold|Lv1|1:2": "毛束データ入力",
+  "3BK|Gold|Lv1|1:3": "毛束データ入力",
+  "3BK|Gold|Lv1|1:4": "毛束データ入力",
+  "3BK|Gold|Lv1|2:1": "毛束データ入力",
+  "3BK|Gold|Lv1|3:1": "毛束データ入力",
+  "3BK|Gold|Lv1|4:1": "毛束データ入力",
+  "3BK|Green|#2A2424|1:1": "毛束データ入力",
+  "3BK|Green|#2A2424|1:2": "毛束データ入力",
+  "3BK|Green|#2A2424|1:3": "毛束データ入力",
+  "3BK|Green|#2A2424|1:4": "毛束データ入力",
+  "3BK|Green|#2A2424|2:1": "毛束データ入力",
+  "3BK|Green|#2A2424|3:1": "毛束データ入力",
+  "3BK|Green|#2A2424|4:1": "毛束データ入力",
+  "3BK|Green|#704831|1:1": "毛束データ入力",
+  "3BK|Green|#704831|1:2": "毛束データ入力",
+  "3BK|Green|#704831|1:3": "毛束データ入力",
+  "3BK|Green|#704831|1:4": "毛束データ入力",
+  "3BK|Green|#704831|2:1": "毛束データ入力",
+  "3BK|Green|#704831|3:1": "毛束データ入力",
+  "3BK|Green|#704831|4:1": "毛束データ入力",
+  "3BK|Green|#C6A981|1:1": "毛束データ入力",
+  "3BK|Green|#C6A981|1:2": "毛束データ入力",
+  "3BK|Green|#C6A981|1:3": "毛束データ入力",
+  "3BK|Green|#C6A981|1:4": "毛束データ入力",
+  "3BK|Green|#C6A981|2:1": "毛束データ入力",
+  "3BK|Green|#C6A981|3:1": "毛束データ入力",
+  "3BK|Green|#C6A981|4:1": "毛束データ入力",
+  "3BK|Green|Lv10|1:1": "毛束データ入力",
+  "3BK|Green|Lv10|1:2": "毛束データ入力",
+  "3BK|Green|Lv10|1:3": "毛束データ入力",
+  "3BK|Green|Lv10|1:4": "毛束データ入力",
+  "3BK|Green|Lv10|2:1": "毛束データ入力",
+  "3BK|Green|Lv10|3:1": "毛束データ入力",
+  "3BK|Green|Lv10|4:1": "毛束データ入力",
+  "3BK|Green|Lv14|1:1": "毛束データ入力",
+  "3BK|Green|Lv14|1:2": "毛束データ入力",
+  "3BK|Green|Lv14|1:3": "毛束データ入力",
+  "3BK|Green|Lv14|1:4": "毛束データ入力",
+  "3BK|Green|Lv14|2:1": "毛束データ入力",
+  "3BK|Green|Lv14|3:1": "毛束データ入力",
+  "3BK|Green|Lv14|4:1": "毛束データ入力",
+  "3BK|Green|Lv1|1:1": "毛束データ入力",
+  "3BK|Green|Lv1|1:2": "毛束データ入力",
+  "3BK|Green|Lv1|1:3": "毛束データ入力",
+  "3BK|Green|Lv1|1:4": "毛束データ入力",
+  "3BK|Green|Lv1|2:1": "毛束データ入力",
+  "3BK|Green|Lv1|3:1": "毛束データ入力",
+  "3BK|Green|Lv1|4:1": "毛束データ入力",
+  "3BK|Lapis|#2A2424|1:1": "毛束データ入力",
+  "3BK|Lapis|#2A2424|1:2": "毛束データ入力",
+  "3BK|Lapis|#2A2424|1:3": "毛束データ入力",
+  "3BK|Lapis|#2A2424|1:4": "毛束データ入力",
+  "3BK|Lapis|#2A2424|2:1": "毛束データ入力",
+  "3BK|Lapis|#2A2424|3:1": "毛束データ入力",
+  "3BK|Lapis|#2A2424|4:1": "毛束データ入力",
+  "3BK|Lapis|#704831|1:1": "毛束データ入力",
+  "3BK|Lapis|#704831|1:2": "毛束データ入力",
+  "3BK|Lapis|#704831|1:3": "毛束データ入力",
+  "3BK|Lapis|#704831|1:4": "毛束データ入力",
+  "3BK|Lapis|#704831|2:1": "毛束データ入力",
+  "3BK|Lapis|#704831|3:1": "毛束データ入力",
+  "3BK|Lapis|#704831|4:1": "毛束データ入力",
+  "3BK|Lapis|#C6A981|1:1": "毛束データ入力",
+  "3BK|Lapis|#C6A981|1:2": "毛束データ入力",
+  "3BK|Lapis|#C6A981|1:3": "毛束データ入力",
+  "3BK|Lapis|#C6A981|1:4": "毛束データ入力",
+  "3BK|Lapis|#C6A981|2:1": "毛束データ入力",
+  "3BK|Lapis|#C6A981|3:1": "毛束データ入力",
+  "3BK|Lapis|#C6A981|4:1": "毛束データ入力",
+  "3BK|Lapis|Lv10|1:1": "毛束データ入力",
+  "3BK|Lapis|Lv10|1:2": "毛束データ入力",
+  "3BK|Lapis|Lv10|1:3": "毛束データ入力",
+  "3BK|Lapis|Lv10|1:4": "毛束データ入力",
+  "3BK|Lapis|Lv10|2:1": "毛束データ入力",
+  "3BK|Lapis|Lv10|3:1": "毛束データ入力",
+  "3BK|Lapis|Lv10|4:1": "毛束データ入力",
+  "3BK|Lapis|Lv14|1:1": "毛束データ入力",
+  "3BK|Lapis|Lv14|1:2": "毛束データ入力",
+  "3BK|Lapis|Lv14|1:3": "毛束データ入力",
+  "3BK|Lapis|Lv14|1:4": "毛束データ入力",
+  "3BK|Lapis|Lv14|2:1": "毛束データ入力",
+  "3BK|Lapis|Lv14|3:1": "毛束データ入力",
+  "3BK|Lapis|Lv14|4:1": "毛束データ入力",
+  "3BK|Lapis|Lv1|1:1": "毛束データ入力",
+  "3BK|Lapis|Lv1|1:2": "毛束データ入力",
+  "3BK|Lapis|Lv1|1:3": "毛束データ入力",
+  "3BK|Lapis|Lv1|1:4": "毛束データ入力",
+  "3BK|Lapis|Lv1|2:1": "毛束データ入力",
+  "3BK|Lapis|Lv1|3:1": "毛束データ入力",
+  "3BK|Lapis|Lv1|4:1": "毛束データ入力",
+  "3BK|Orange|#2A2424|1:1": "毛束データ入力",
+  "3BK|Orange|#2A2424|1:2": "毛束データ入力",
+  "3BK|Orange|#2A2424|1:3": "毛束データ入力",
+  "3BK|Orange|#2A2424|1:4": "毛束データ入力",
+  "3BK|Orange|#2A2424|2:1": "毛束データ入力",
+  "3BK|Orange|#2A2424|3:1": "毛束データ入力",
+  "3BK|Orange|#2A2424|4:1": "毛束データ入力",
+  "3BK|Orange|#704831|1:1": "毛束データ入力",
+  "3BK|Orange|#704831|1:2": "毛束データ入力",
+  "3BK|Orange|#704831|1:3": "毛束データ入力",
+  "3BK|Orange|#704831|1:4": "毛束データ入力",
+  "3BK|Orange|#704831|2:1": "毛束データ入力",
+  "3BK|Orange|#704831|3:1": "毛束データ入力",
+  "3BK|Orange|#704831|4:1": "毛束データ入力",
+  "3BK|Orange|#C6A981|1:1": "毛束データ入力",
+  "3BK|Orange|#C6A981|1:2": "毛束データ入力",
+  "3BK|Orange|#C6A981|1:3": "毛束データ入力",
+  "3BK|Orange|#C6A981|1:4": "毛束データ入力",
+  "3BK|Orange|#C6A981|2:1": "毛束データ入力",
+  "3BK|Orange|#C6A981|3:1": "毛束データ入力",
+  "3BK|Orange|#C6A981|4:1": "毛束データ入力",
+  "3BK|Orange|Lv10|1:1": "毛束データ入力",
+  "3BK|Orange|Lv10|1:2": "毛束データ入力",
+  "3BK|Orange|Lv10|1:3": "毛束データ入力",
+  "3BK|Orange|Lv10|1:4": "毛束データ入力",
+  "3BK|Orange|Lv10|2:1": "毛束データ入力",
+  "3BK|Orange|Lv10|3:1": "毛束データ入力",
+  "3BK|Orange|Lv10|4:1": "毛束データ入力",
+  "3BK|Orange|Lv14|1:1": "毛束データ入力",
+  "3BK|Orange|Lv14|1:2": "毛束データ入力",
+  "3BK|Orange|Lv14|1:3": "毛束データ入力",
+  "3BK|Orange|Lv14|1:4": "毛束データ入力",
+  "3BK|Orange|Lv14|2:1": "毛束データ入力",
+  "3BK|Orange|Lv14|3:1": "毛束データ入力",
+  "3BK|Orange|Lv14|4:1": "毛束データ入力",
+  "3BK|Orange|Lv1|1:1": "毛束データ入力",
+  "3BK|Orange|Lv1|1:2": "毛束データ入力",
+  "3BK|Orange|Lv1|1:3": "毛束データ入力",
+  "3BK|Orange|Lv1|1:4": "毛束データ入力",
+  "3BK|Orange|Lv1|2:1": "毛束データ入力",
+  "3BK|Orange|Lv1|3:1": "毛束データ入力",
+  "3BK|Orange|Lv1|4:1": "毛束データ入力",
+  "3BK|Red|#2A2424|1:1": "毛束データ入力",
+  "3BK|Red|#2A2424|1:2": "毛束データ入力",
+  "3BK|Red|#2A2424|1:3": "毛束データ入力",
+  "3BK|Red|#2A2424|1:4": "毛束データ入力",
+  "3BK|Red|#2A2424|2:1": "毛束データ入力",
+  "3BK|Red|#2A2424|3:1": "毛束データ入力",
+  "3BK|Red|#2A2424|4:1": "毛束データ入力",
+  "3BK|Red|#704831|1:1": "毛束データ入力",
+  "3BK|Red|#704831|1:2": "毛束データ入力",
+  "3BK|Red|#704831|1:3": "毛束データ入力",
+  "3BK|Red|#704831|1:4": "毛束データ入力",
+  "3BK|Red|#704831|2:1": "毛束データ入力",
+  "3BK|Red|#704831|3:1": "毛束データ入力",
+  "3BK|Red|#704831|4:1": "毛束データ入力",
+  "3BK|Red|#C6A981|1:1": "毛束データ入力",
+  "3BK|Red|#C6A981|1:2": "毛束データ入力",
+  "3BK|Red|#C6A981|1:3": "毛束データ入力",
+  "3BK|Red|#C6A981|1:4": "毛束データ入力",
+  "3BK|Red|#C6A981|2:1": "毛束データ入力",
+  "3BK|Red|#C6A981|3:1": "毛束データ入力",
+  "3BK|Red|#C6A981|4:1": "毛束データ入力",
+  "3BK|Red|Lv10|1:1": "毛束データ入力",
+  "3BK|Red|Lv10|1:2": "毛束データ入力",
+  "3BK|Red|Lv10|1:3": "毛束データ入力",
+  "3BK|Red|Lv10|1:4": "毛束データ入力",
+  "3BK|Red|Lv10|2:1": "毛束データ入力",
+  "3BK|Red|Lv10|3:1": "毛束データ入力",
+  "3BK|Red|Lv10|4:1": "毛束データ入力",
+  "3BK|Red|Lv14|1:1": "毛束データ入力",
+  "3BK|Red|Lv14|1:2": "毛束データ入力",
+  "3BK|Red|Lv14|1:3": "毛束データ入力",
+  "3BK|Red|Lv14|1:4": "毛束データ入力",
+  "3BK|Red|Lv14|2:1": "毛束データ入力",
+  "3BK|Red|Lv14|3:1": "毛束データ入力",
+  "3BK|Red|Lv14|4:1": "毛束データ入力",
+  "3BK|Red|Lv1|1:1": "毛束データ入力",
+  "3BK|Red|Lv1|1:2": "毛束データ入力",
+  "3BK|Red|Lv1|1:3": "毛束データ入力",
+  "3BK|Red|Lv1|1:4": "毛束データ入力",
+  "3BK|Red|Lv1|2:1": "毛束データ入力",
+  "3BK|Red|Lv1|3:1": "毛束データ入力",
+  "3BK|Red|Lv1|4:1": "毛束データ入力",
+  "3BK|Violet|#2A2424|1:1": "毛束データ入力",
+  "3BK|Violet|#2A2424|1:2": "毛束データ入力",
+  "3BK|Violet|#2A2424|1:3": "毛束データ入力",
+  "3BK|Violet|#2A2424|1:4": "毛束データ入力",
+  "3BK|Violet|#2A2424|2:1": "毛束データ入力",
+  "3BK|Violet|#2A2424|3:1": "毛束データ入力",
+  "3BK|Violet|#2A2424|4:1": "毛束データ入力",
+  "3BK|Violet|#704831|1:1": "毛束データ入力",
+  "3BK|Violet|#704831|1:2": "毛束データ入力",
+  "3BK|Violet|#704831|1:3": "毛束データ入力",
+  "3BK|Violet|#704831|1:4": "毛束データ入力",
+  "3BK|Violet|#704831|2:1": "毛束データ入力",
+  "3BK|Violet|#704831|3:1": "毛束データ入力",
+  "3BK|Violet|#704831|4:1": "毛束データ入力",
+  "3BK|Violet|#C6A981|1:1": "毛束データ入力",
+  "3BK|Violet|#C6A981|1:2": "毛束データ入力",
+  "3BK|Violet|#C6A981|1:3": "毛束データ入力",
+  "3BK|Violet|#C6A981|1:4": "毛束データ入力",
+  "3BK|Violet|#C6A981|2:1": "毛束データ入力",
+  "3BK|Violet|#C6A981|3:1": "毛束データ入力",
+  "3BK|Violet|#C6A981|4:1": "毛束データ入力",
+  "3BK|Violet|Lv10|1:1": "毛束データ入力",
+  "3BK|Violet|Lv10|1:2": "毛束データ入力",
+  "3BK|Violet|Lv10|1:3": "毛束データ入力",
+  "3BK|Violet|Lv10|1:4": "毛束データ入力",
+  "3BK|Violet|Lv10|2:1": "毛束データ入力",
+  "3BK|Violet|Lv10|3:1": "毛束データ入力",
+  "3BK|Violet|Lv10|4:1": "毛束データ入力",
+  "3BK|Violet|Lv14|1:1": "毛束データ入力",
+  "3BK|Violet|Lv14|1:2": "毛束データ入力",
+  "3BK|Violet|Lv14|1:3": "毛束データ入力",
+  "3BK|Violet|Lv14|1:4": "毛束データ入力",
+  "3BK|Violet|Lv14|2:1": "毛束データ入力",
+  "3BK|Violet|Lv14|3:1": "毛束データ入力",
+  "3BK|Violet|Lv14|4:1": "毛束データ入力",
+  "3BK|Violet|Lv1|1:1": "毛束データ入力",
+  "3BK|Violet|Lv1|1:2": "毛束データ入力",
+  "3BK|Violet|Lv1|1:3": "毛束データ入力",
+  "3BK|Violet|Lv1|1:4": "毛束データ入力",
+  "3BK|Violet|Lv1|2:1": "毛束データ入力",
+  "3BK|Violet|Lv1|3:1": "毛束データ入力",
+  "3BK|Violet|Lv1|4:1": "毛束データ入力",
+  "5BK|Blue|#2A2424|1:1": "毛束データ入力",
+  "5BK|Blue|#2A2424|1:2": "毛束データ入力",
+  "5BK|Blue|#2A2424|1:3": "毛束データ入力",
+  "5BK|Blue|#2A2424|1:4": "毛束データ入力",
+  "5BK|Blue|#2A2424|2:1": "毛束データ入力",
+  "5BK|Blue|#2A2424|3:1": "毛束データ入力",
+  "5BK|Blue|#2A2424|4:1": "毛束データ入力",
+  "5BK|Blue|#704831|1:1": "毛束データ入力",
+  "5BK|Blue|#704831|1:2": "毛束データ入力",
+  "5BK|Blue|#704831|1:3": "毛束データ入力",
+  "5BK|Blue|#704831|1:4": "毛束データ入力",
+  "5BK|Blue|#704831|2:1": "毛束データ入力",
+  "5BK|Blue|#704831|3:1": "毛束データ入力",
+  "5BK|Blue|#704831|4:1": "毛束データ入力",
+  "5BK|Blue|#C6A981|1:1": "毛束データ入力",
+  "5BK|Blue|#C6A981|1:2": "毛束データ入力",
+  "5BK|Blue|#C6A981|1:3": "毛束データ入力",
+  "5BK|Blue|#C6A981|1:4": "毛束データ入力",
+  "5BK|Blue|#C6A981|2:1": "毛束データ入力",
+  "5BK|Blue|#C6A981|3:1": "毛束データ入力",
+  "5BK|Blue|#C6A981|4:1": "毛束データ入力",
+  "5BK|Blue|Lv10|1:1": "毛束データ入力",
+  "5BK|Blue|Lv10|1:2": "毛束データ入力",
+  "5BK|Blue|Lv10|1:3": "毛束データ入力",
+  "5BK|Blue|Lv10|1:4": "毛束データ入力",
+  "5BK|Blue|Lv10|2:1": "毛束データ入力",
+  "5BK|Blue|Lv10|3:1": "毛束データ入力",
+  "5BK|Blue|Lv10|4:1": "毛束データ入力",
+  "5BK|Blue|Lv14|1:1": "毛束データ入力",
+  "5BK|Blue|Lv14|1:2": "毛束データ入力",
+  "5BK|Blue|Lv14|1:3": "毛束データ入力",
+  "5BK|Blue|Lv14|1:4": "毛束データ入力",
+  "5BK|Blue|Lv14|2:1": "毛束データ入力",
+  "5BK|Blue|Lv14|3:1": "毛束データ入力",
+  "5BK|Blue|Lv14|4:1": "毛束データ入力",
+  "5BK|Blue|Lv1|1:1": "毛束データ入力",
+  "5BK|Blue|Lv1|1:2": "毛束データ入力",
+  "5BK|Blue|Lv1|1:3": "毛束データ入力",
+  "5BK|Blue|Lv1|1:4": "毛束データ入力",
+  "5BK|Blue|Lv1|2:1": "毛束データ入力",
+  "5BK|Blue|Lv1|3:1": "毛束データ入力",
+  "5BK|Blue|Lv1|4:1": "毛束データ入力",
+  "5BK|Cyan|#2A2424|1:1": "毛束データ入力",
+  "5BK|Cyan|#2A2424|1:2": "毛束データ入力",
+  "5BK|Cyan|#2A2424|1:3": "毛束データ入力",
+  "5BK|Cyan|#2A2424|1:4": "毛束データ入力",
+  "5BK|Cyan|#2A2424|2:1": "毛束データ入力",
+  "5BK|Cyan|#2A2424|3:1": "毛束データ入力",
+  "5BK|Cyan|#2A2424|4:1": "毛束データ入力",
+  "5BK|Cyan|#704831|1:1": "毛束データ入力",
+  "5BK|Cyan|#704831|1:2": "毛束データ入力",
+  "5BK|Cyan|#704831|1:3": "毛束データ入力",
+  "5BK|Cyan|#704831|1:4": "毛束データ入力",
+  "5BK|Cyan|#704831|2:1": "毛束データ入力",
+  "5BK|Cyan|#704831|3:1": "毛束データ入力",
+  "5BK|Cyan|#704831|4:1": "毛束データ入力",
+  "5BK|Cyan|#C6A981|1:1": "毛束データ入力",
+  "5BK|Cyan|#C6A981|1:2": "毛束データ入力",
+  "5BK|Cyan|#C6A981|1:3": "毛束データ入力",
+  "5BK|Cyan|#C6A981|1:4": "毛束データ入力",
+  "5BK|Cyan|#C6A981|2:1": "毛束データ入力",
+  "5BK|Cyan|#C6A981|3:1": "毛束データ入力",
+  "5BK|Cyan|#C6A981|4:1": "毛束データ入力",
+  "5BK|Cyan|Lv10|1:1": "毛束データ入力",
+  "5BK|Cyan|Lv10|1:2": "毛束データ入力",
+  "5BK|Cyan|Lv10|1:3": "毛束データ入力",
+  "5BK|Cyan|Lv10|1:4": "毛束データ入力",
+  "5BK|Cyan|Lv10|2:1": "毛束データ入力",
+  "5BK|Cyan|Lv10|3:1": "毛束データ入力",
+  "5BK|Cyan|Lv10|4:1": "毛束データ入力",
+  "5BK|Cyan|Lv14|1:1": "毛束データ入力",
+  "5BK|Cyan|Lv14|1:2": "毛束データ入力",
+  "5BK|Cyan|Lv14|1:3": "毛束データ入力",
+  "5BK|Cyan|Lv14|1:4": "毛束データ入力",
+  "5BK|Cyan|Lv14|2:1": "毛束データ入力",
+  "5BK|Cyan|Lv14|3:1": "毛束データ入力",
+  "5BK|Cyan|Lv14|4:1": "毛束データ入力",
+  "5BK|Cyan|Lv1|1:1": "毛束データ入力",
+  "5BK|Cyan|Lv1|1:2": "毛束データ入力",
+  "5BK|Cyan|Lv1|1:3": "毛束データ入力",
+  "5BK|Cyan|Lv1|1:4": "毛束データ入力",
+  "5BK|Cyan|Lv1|2:1": "毛束データ入力",
+  "5BK|Cyan|Lv1|3:1": "毛束データ入力",
+  "5BK|Cyan|Lv1|4:1": "毛束データ入力",
+  "5BK|FPink|#2A2424|1:1": "毛束データ入力",
+  "5BK|FPink|#2A2424|1:2": "毛束データ入力",
+  "5BK|FPink|#2A2424|1:3": "毛束データ入力",
+  "5BK|FPink|#2A2424|1:4": "毛束データ入力",
+  "5BK|FPink|#2A2424|2:1": "毛束データ入力",
+  "5BK|FPink|#2A2424|3:1": "毛束データ入力",
+  "5BK|FPink|#2A2424|4:1": "毛束データ入力",
+  "5BK|FPink|#704831|1:1": "毛束データ入力",
+  "5BK|FPink|#704831|1:2": "毛束データ入力",
+  "5BK|FPink|#704831|1:3": "毛束データ入力",
+  "5BK|FPink|#704831|1:4": "毛束データ入力",
+  "5BK|FPink|#704831|2:1": "毛束データ入力",
+  "5BK|FPink|#704831|3:1": "毛束データ入力",
+  "5BK|FPink|#704831|4:1": "毛束データ入力",
+  "5BK|FPink|#C6A981|1:1": "毛束データ入力",
+  "5BK|FPink|#C6A981|1:2": "毛束データ入力",
+  "5BK|FPink|#C6A981|1:3": "毛束データ入力",
+  "5BK|FPink|#C6A981|1:4": "毛束データ入力",
+  "5BK|FPink|#C6A981|2:1": "毛束データ入力",
+  "5BK|FPink|#C6A981|3:1": "毛束データ入力",
+  "5BK|FPink|#C6A981|4:1": "毛束データ入力",
+  "5BK|FPink|Lv10|1:1": "毛束データ入力",
+  "5BK|FPink|Lv10|1:2": "毛束データ入力",
+  "5BK|FPink|Lv10|1:3": "毛束データ入力",
+  "5BK|FPink|Lv10|1:4": "毛束データ入力",
+  "5BK|FPink|Lv10|2:1": "毛束データ入力",
+  "5BK|FPink|Lv10|3:1": "毛束データ入力",
+  "5BK|FPink|Lv10|4:1": "毛束データ入力",
+  "5BK|FPink|Lv14|1:1": "毛束データ入力",
+  "5BK|FPink|Lv14|1:2": "毛束データ入力",
+  "5BK|FPink|Lv14|1:3": "毛束データ入力",
+  "5BK|FPink|Lv14|1:4": "毛束データ入力",
+  "5BK|FPink|Lv14|2:1": "毛束データ入力",
+  "5BK|FPink|Lv14|3:1": "毛束データ入力",
+  "5BK|FPink|Lv14|4:1": "毛束データ入力",
+  "5BK|FPink|Lv1|1:1": "毛束データ入力",
+  "5BK|FPink|Lv1|1:2": "毛束データ入力",
+  "5BK|FPink|Lv1|1:3": "毛束データ入力",
+  "5BK|FPink|Lv1|1:4": "毛束データ入力",
+  "5BK|FPink|Lv1|2:1": "毛束データ入力",
+  "5BK|FPink|Lv1|3:1": "毛束データ入力",
+  "5BK|FPink|Lv1|4:1": "毛束データ入力",
+  "5BK|Gold|#2A2424|1:1": "毛束データ入力",
+  "5BK|Gold|#2A2424|1:2": "毛束データ入力",
+  "5BK|Gold|#2A2424|1:3": "毛束データ入力",
+  "5BK|Gold|#2A2424|1:4": "毛束データ入力",
+  "5BK|Gold|#2A2424|2:1": "毛束データ入力",
+  "5BK|Gold|#2A2424|3:1": "毛束データ入力",
+  "5BK|Gold|#2A2424|4:1": "毛束データ入力",
+  "5BK|Gold|#704831|1:1": "毛束データ入力",
+  "5BK|Gold|#704831|1:2": "毛束データ入力",
+  "5BK|Gold|#704831|1:3": "毛束データ入力",
+  "5BK|Gold|#704831|1:4": "毛束データ入力",
+  "5BK|Gold|#704831|2:1": "毛束データ入力",
+  "5BK|Gold|#704831|3:1": "毛束データ入力",
+  "5BK|Gold|#704831|4:1": "毛束データ入力",
+  "5BK|Gold|#C6A981|1:1": "毛束データ入力",
+  "5BK|Gold|#C6A981|1:2": "毛束データ入力",
+  "5BK|Gold|#C6A981|1:3": "毛束データ入力",
+  "5BK|Gold|#C6A981|1:4": "毛束データ入力",
+  "5BK|Gold|#C6A981|2:1": "毛束データ入力",
+  "5BK|Gold|#C6A981|3:1": "毛束データ入力",
+  "5BK|Gold|#C6A981|4:1": "毛束データ入力",
+  "5BK|Gold|Lv10|1:1": "毛束データ入力",
+  "5BK|Gold|Lv10|1:2": "毛束データ入力",
+  "5BK|Gold|Lv10|1:3": "毛束データ入力",
+  "5BK|Gold|Lv10|1:4": "毛束データ入力",
+  "5BK|Gold|Lv10|2:1": "毛束データ入力",
+  "5BK|Gold|Lv10|3:1": "毛束データ入力",
+  "5BK|Gold|Lv10|4:1": "毛束データ入力",
+  "5BK|Gold|Lv14|1:1": "毛束データ入力",
+  "5BK|Gold|Lv14|1:2": "毛束データ入力",
+  "5BK|Gold|Lv14|1:3": "毛束データ入力",
+  "5BK|Gold|Lv14|1:4": "毛束データ入力",
+  "5BK|Gold|Lv14|2:1": "毛束データ入力",
+  "5BK|Gold|Lv14|3:1": "毛束データ入力",
+  "5BK|Gold|Lv14|4:1": "毛束データ入力",
+  "5BK|Gold|Lv1|1:1": "毛束データ入力",
+  "5BK|Gold|Lv1|1:2": "毛束データ入力",
+  "5BK|Gold|Lv1|1:3": "毛束データ入力",
+  "5BK|Gold|Lv1|1:4": "毛束データ入力",
+  "5BK|Gold|Lv1|2:1": "毛束データ入力",
+  "5BK|Gold|Lv1|3:1": "毛束データ入力",
+  "5BK|Gold|Lv1|4:1": "毛束データ入力",
+  "5BK|Green|#2A2424|1:1": "毛束データ入力",
+  "5BK|Green|#2A2424|1:2": "毛束データ入力",
+  "5BK|Green|#2A2424|1:3": "毛束データ入力",
+  "5BK|Green|#2A2424|1:4": "毛束データ入力",
+  "5BK|Green|#2A2424|2:1": "毛束データ入力",
+  "5BK|Green|#2A2424|3:1": "毛束データ入力",
+  "5BK|Green|#2A2424|4:1": "毛束データ入力",
+  "5BK|Green|#704831|1:1": "毛束データ入力",
+  "5BK|Green|#704831|1:2": "毛束データ入力",
+  "5BK|Green|#704831|1:3": "毛束データ入力",
+  "5BK|Green|#704831|1:4": "毛束データ入力",
+  "5BK|Green|#704831|2:1": "毛束データ入力",
+  "5BK|Green|#704831|3:1": "毛束データ入力",
+  "5BK|Green|#704831|4:1": "毛束データ入力",
+  "5BK|Green|#C6A981|1:1": "毛束データ入力",
+  "5BK|Green|#C6A981|1:2": "毛束データ入力",
+  "5BK|Green|#C6A981|1:3": "毛束データ入力",
+  "5BK|Green|#C6A981|1:4": "毛束データ入力",
+  "5BK|Green|#C6A981|2:1": "毛束データ入力",
+  "5BK|Green|#C6A981|3:1": "毛束データ入力",
+  "5BK|Green|#C6A981|4:1": "毛束データ入力",
+  "5BK|Green|Lv10|1:1": "毛束データ入力",
+  "5BK|Green|Lv10|1:2": "毛束データ入力",
+  "5BK|Green|Lv10|1:3": "毛束データ入力",
+  "5BK|Green|Lv10|1:4": "毛束データ入力",
+  "5BK|Green|Lv10|2:1": "毛束データ入力",
+  "5BK|Green|Lv10|3:1": "毛束データ入力",
+  "5BK|Green|Lv10|4:1": "毛束データ入力",
+  "5BK|Green|Lv14|1:1": "毛束データ入力",
+  "5BK|Green|Lv14|1:2": "毛束データ入力",
+  "5BK|Green|Lv14|1:3": "毛束データ入力",
+  "5BK|Green|Lv14|1:4": "毛束データ入力",
+  "5BK|Green|Lv14|2:1": "毛束データ入力",
+  "5BK|Green|Lv14|3:1": "毛束データ入力",
+  "5BK|Green|Lv14|4:1": "毛束データ入力",
+  "5BK|Green|Lv1|1:1": "毛束データ入力",
+  "5BK|Green|Lv1|1:2": "毛束データ入力",
+  "5BK|Green|Lv1|1:3": "毛束データ入力",
+  "5BK|Green|Lv1|1:4": "毛束データ入力",
+  "5BK|Green|Lv1|2:1": "毛束データ入力",
+  "5BK|Green|Lv1|3:1": "毛束データ入力",
+  "5BK|Green|Lv1|4:1": "毛束データ入力",
+  "5BK|Lapis|#2A2424|1:1": "毛束データ入力",
+  "5BK|Lapis|#2A2424|1:2": "毛束データ入力",
+  "5BK|Lapis|#2A2424|1:3": "毛束データ入力",
+  "5BK|Lapis|#2A2424|1:4": "毛束データ入力",
+  "5BK|Lapis|#2A2424|2:1": "毛束データ入力",
+  "5BK|Lapis|#2A2424|3:1": "毛束データ入力",
+  "5BK|Lapis|#2A2424|4:1": "毛束データ入力",
+  "5BK|Lapis|#704831|1:1": "毛束データ入力",
+  "5BK|Lapis|#704831|1:2": "毛束データ入力",
+  "5BK|Lapis|#704831|1:3": "毛束データ入力",
+  "5BK|Lapis|#704831|1:4": "毛束データ入力",
+  "5BK|Lapis|#704831|2:1": "毛束データ入力",
+  "5BK|Lapis|#704831|3:1": "毛束データ入力",
+  "5BK|Lapis|#704831|4:1": "毛束データ入力",
+  "5BK|Lapis|#C6A981|1:1": "毛束データ入力",
+  "5BK|Lapis|#C6A981|1:2": "毛束データ入力",
+  "5BK|Lapis|#C6A981|1:3": "毛束データ入力",
+  "5BK|Lapis|#C6A981|1:4": "毛束データ入力",
+  "5BK|Lapis|#C6A981|2:1": "毛束データ入力",
+  "5BK|Lapis|#C6A981|3:1": "毛束データ入力",
+  "5BK|Lapis|#C6A981|4:1": "毛束データ入力",
+  "5BK|Lapis|Lv10|1:1": "毛束データ入力",
+  "5BK|Lapis|Lv10|1:2": "毛束データ入力",
+  "5BK|Lapis|Lv10|1:3": "毛束データ入力",
+  "5BK|Lapis|Lv10|1:4": "毛束データ入力",
+  "5BK|Lapis|Lv10|2:1": "毛束データ入力",
+  "5BK|Lapis|Lv10|3:1": "毛束データ入力",
+  "5BK|Lapis|Lv10|4:1": "毛束データ入力",
+  "5BK|Lapis|Lv14|1:1": "毛束データ入力",
+  "5BK|Lapis|Lv14|1:2": "毛束データ入力",
+  "5BK|Lapis|Lv14|1:3": "毛束データ入力",
+  "5BK|Lapis|Lv14|1:4": "毛束データ入力",
+  "5BK|Lapis|Lv14|2:1": "毛束データ入力",
+  "5BK|Lapis|Lv14|3:1": "毛束データ入力",
+  "5BK|Lapis|Lv14|4:1": "毛束データ入力",
+  "5BK|Lapis|Lv1|1:1": "毛束データ入力",
+  "5BK|Lapis|Lv1|1:2": "毛束データ入力",
+  "5BK|Lapis|Lv1|1:3": "毛束データ入力",
+  "5BK|Lapis|Lv1|1:4": "毛束データ入力",
+  "5BK|Lapis|Lv1|2:1": "毛束データ入力",
+  "5BK|Lapis|Lv1|3:1": "毛束データ入力",
+  "5BK|Lapis|Lv1|4:1": "毛束データ入力",
+  "5BK|Orange|#2A2424|1:1": "毛束データ入力",
+  "5BK|Orange|#2A2424|1:2": "毛束データ入力",
+  "5BK|Orange|#2A2424|1:3": "毛束データ入力",
+  "5BK|Orange|#2A2424|1:4": "毛束データ入力",
+  "5BK|Orange|#2A2424|2:1": "毛束データ入力",
+  "5BK|Orange|#2A2424|3:1": "毛束データ入力",
+  "5BK|Orange|#2A2424|4:1": "毛束データ入力",
+  "5BK|Orange|#704831|1:1": "毛束データ入力",
+  "5BK|Orange|#704831|1:2": "毛束データ入力",
+  "5BK|Orange|#704831|1:3": "毛束データ入力",
+  "5BK|Orange|#704831|1:4": "毛束データ入力",
+  "5BK|Orange|#704831|2:1": "毛束データ入力",
+  "5BK|Orange|#704831|3:1": "毛束データ入力",
+  "5BK|Orange|#704831|4:1": "毛束データ入力",
+  "5BK|Orange|#C6A981|1:1": "毛束データ入力",
+  "5BK|Orange|#C6A981|1:2": "毛束データ入力",
+  "5BK|Orange|#C6A981|1:3": "毛束データ入力",
+  "5BK|Orange|#C6A981|1:4": "毛束データ入力",
+  "5BK|Orange|#C6A981|2:1": "毛束データ入力",
+  "5BK|Orange|#C6A981|3:1": "毛束データ入力",
+  "5BK|Orange|#C6A981|4:1": "毛束データ入力",
+  "5BK|Orange|Lv10|1:1": "毛束データ入力",
+  "5BK|Orange|Lv10|1:2": "毛束データ入力",
+  "5BK|Orange|Lv10|1:3": "毛束データ入力",
+  "5BK|Orange|Lv10|1:4": "毛束データ入力",
+  "5BK|Orange|Lv10|2:1": "毛束データ入力",
+  "5BK|Orange|Lv10|3:1": "毛束データ入力",
+  "5BK|Orange|Lv10|4:1": "毛束データ入力",
+  "5BK|Orange|Lv14|1:1": "毛束データ入力",
+  "5BK|Orange|Lv14|1:2": "毛束データ入力",
+  "5BK|Orange|Lv14|1:3": "毛束データ入力",
+  "5BK|Orange|Lv14|1:4": "毛束データ入力",
+  "5BK|Orange|Lv14|2:1": "毛束データ入力",
+  "5BK|Orange|Lv14|3:1": "毛束データ入力",
+  "5BK|Orange|Lv14|4:1": "毛束データ入力",
+  "5BK|Orange|Lv1|1:1": "毛束データ入力",
+  "5BK|Orange|Lv1|1:2": "毛束データ入力",
+  "5BK|Orange|Lv1|1:3": "毛束データ入力",
+  "5BK|Orange|Lv1|1:4": "毛束データ入力",
+  "5BK|Orange|Lv1|2:1": "毛束データ入力",
+  "5BK|Orange|Lv1|3:1": "毛束データ入力",
+  "5BK|Orange|Lv1|4:1": "毛束データ入力",
+  "5BK|Red|#2A2424|1:1": "毛束データ入力",
+  "5BK|Red|#2A2424|1:2": "毛束データ入力",
+  "5BK|Red|#2A2424|1:3": "毛束データ入力",
+  "5BK|Red|#2A2424|1:4": "毛束データ入力",
+  "5BK|Red|#2A2424|2:1": "毛束データ入力",
+  "5BK|Red|#2A2424|3:1": "毛束データ入力",
+  "5BK|Red|#2A2424|4:1": "毛束データ入力",
+  "5BK|Red|#704831|1:1": "毛束データ入力",
+  "5BK|Red|#704831|1:2": "毛束データ入力",
+  "5BK|Red|#704831|1:3": "毛束データ入力",
+  "5BK|Red|#704831|1:4": "毛束データ入力",
+  "5BK|Red|#704831|2:1": "毛束データ入力",
+  "5BK|Red|#704831|3:1": "毛束データ入力",
+  "5BK|Red|#704831|4:1": "毛束データ入力",
+  "5BK|Red|#C6A981|1:1": "毛束データ入力",
+  "5BK|Red|#C6A981|1:2": "毛束データ入力",
+  "5BK|Red|#C6A981|1:3": "毛束データ入力",
+  "5BK|Red|#C6A981|1:4": "毛束データ入力",
+  "5BK|Red|#C6A981|2:1": "毛束データ入力",
+  "5BK|Red|#C6A981|3:1": "毛束データ入力",
+  "5BK|Red|#C6A981|4:1": "毛束データ入力",
+  "5BK|Red|Lv10|1:1": "毛束データ入力",
+  "5BK|Red|Lv10|1:2": "毛束データ入力",
+  "5BK|Red|Lv10|1:3": "毛束データ入力",
+  "5BK|Red|Lv10|1:4": "毛束データ入力",
+  "5BK|Red|Lv10|2:1": "毛束データ入力",
+  "5BK|Red|Lv10|3:1": "毛束データ入力",
+  "5BK|Red|Lv10|4:1": "毛束データ入力",
+  "5BK|Red|Lv14|1:1": "毛束データ入力",
+  "5BK|Red|Lv14|1:2": "毛束データ入力",
+  "5BK|Red|Lv14|1:3": "毛束データ入力",
+  "5BK|Red|Lv14|1:4": "毛束データ入力",
+  "5BK|Red|Lv14|2:1": "毛束データ入力",
+  "5BK|Red|Lv14|3:1": "毛束データ入力",
+  "5BK|Red|Lv14|4:1": "毛束データ入力",
+  "5BK|Red|Lv1|1:1": "毛束データ入力",
+  "5BK|Red|Lv1|1:2": "毛束データ入力",
+  "5BK|Red|Lv1|1:3": "毛束データ入力",
+  "5BK|Red|Lv1|1:4": "毛束データ入力",
+  "5BK|Red|Lv1|2:1": "毛束データ入力",
+  "5BK|Red|Lv1|3:1": "毛束データ入力",
+  "5BK|Red|Lv1|4:1": "毛束データ入力",
+  "5BK|Violet|#2A2424|1:1": "毛束データ入力",
+  "5BK|Violet|#2A2424|1:2": "毛束データ入力",
+  "5BK|Violet|#2A2424|1:3": "毛束データ入力",
+  "5BK|Violet|#2A2424|1:4": "毛束データ入力",
+  "5BK|Violet|#2A2424|2:1": "毛束データ入力",
+  "5BK|Violet|#2A2424|3:1": "毛束データ入力",
+  "5BK|Violet|#2A2424|4:1": "毛束データ入力",
+  "5BK|Violet|#704831|1:1": "毛束データ入力",
+  "5BK|Violet|#704831|1:2": "毛束データ入力",
+  "5BK|Violet|#704831|1:3": "毛束データ入力",
+  "5BK|Violet|#704831|1:4": "毛束データ入力",
+  "5BK|Violet|#704831|2:1": "毛束データ入力",
+  "5BK|Violet|#704831|3:1": "毛束データ入力",
+  "5BK|Violet|#704831|4:1": "毛束データ入力",
+  "5BK|Violet|#C6A981|1:1": "毛束データ入力",
+  "5BK|Violet|#C6A981|1:2": "毛束データ入力",
+  "5BK|Violet|#C6A981|1:3": "毛束データ入力",
+  "5BK|Violet|#C6A981|1:4": "毛束データ入力",
+  "5BK|Violet|#C6A981|2:1": "毛束データ入力",
+  "5BK|Violet|#C6A981|3:1": "毛束データ入力",
+  "5BK|Violet|#C6A981|4:1": "毛束データ入力",
+  "5BK|Violet|Lv10|1:1": "毛束データ入力",
+  "5BK|Violet|Lv10|1:2": "毛束データ入力",
+  "5BK|Violet|Lv10|1:3": "毛束データ入力",
+  "5BK|Violet|Lv10|1:4": "毛束データ入力",
+  "5BK|Violet|Lv10|2:1": "毛束データ入力",
+  "5BK|Violet|Lv10|3:1": "毛束データ入力",
+  "5BK|Violet|Lv10|4:1": "毛束データ入力",
+  "5BK|Violet|Lv14|1:1": "毛束データ入力",
+  "5BK|Violet|Lv14|1:2": "毛束データ入力",
+  "5BK|Violet|Lv14|1:3": "毛束データ入力",
+  "5BK|Violet|Lv14|1:4": "毛束データ入力",
+  "5BK|Violet|Lv14|2:1": "毛束データ入力",
+  "5BK|Violet|Lv14|3:1": "毛束データ入力",
+  "5BK|Violet|Lv14|4:1": "毛束データ入力",
+  "5BK|Violet|Lv1|1:1": "毛束データ入力",
+  "5BK|Violet|Lv1|1:2": "毛束データ入力",
+  "5BK|Violet|Lv1|1:3": "毛束データ入力",
+  "5BK|Violet|Lv1|1:4": "毛束データ入力",
+  "5BK|Violet|Lv1|2:1": "毛束データ入力",
+  "5BK|Violet|Lv1|3:1": "毛束データ入力",
+  "5BK|Violet|Lv1|4:1": "毛束データ入力",
+  "5BR|Blue|#2A2424|1:1": "毛束データ入力",
+  "5BR|Blue|#2A2424|1:2": "毛束データ入力",
+  "5BR|Blue|#2A2424|1:3": "毛束データ入力",
+  "5BR|Blue|#2A2424|1:4": "実測データ",
+  "5BR|Blue|#2A2424|2:1": "毛束データ入力",
+  "5BR|Blue|#2A2424|3:1": "毛束データ入力",
+  "5BR|Blue|#2A2424|4:1": "毛束データ入力",
+  "5BR|Blue|#704831|1:1": "毛束データ入力",
+  "5BR|Blue|#704831|1:2": "毛束データ入力",
+  "5BR|Blue|#704831|1:3": "毛束データ入力",
+  "5BR|Blue|#704831|1:4": "実測データ",
+  "5BR|Blue|#704831|2:1": "毛束データ入力",
+  "5BR|Blue|#704831|3:1": "毛束データ入力",
+  "5BR|Blue|#704831|4:1": "毛束データ入力",
+  "5BR|Blue|#C6A981|1:4": "実測データ",
+  "5BR|Blue|Lv10|1:1": "毛束データ入力",
+  "5BR|Blue|Lv10|1:2": "毛束データ入力",
+  "5BR|Blue|Lv10|1:3": "毛束データ入力",
+  "5BR|Blue|Lv10|1:4": "実測データ",
+  "5BR|Blue|Lv10|2:1": "毛束データ入力",
+  "5BR|Blue|Lv10|3:1": "毛束データ入力",
+  "5BR|Blue|Lv10|4:1": "毛束データ入力",
+  "5BR|Blue|Lv14|1:4": "実測データ",
+  "5BR|Blue|Lv1|1:1": "毛束データ入力",
+  "5BR|Blue|Lv1|1:2": "毛束データ入力",
+  "5BR|Blue|Lv1|1:3": "毛束データ入力",
+  "5BR|Blue|Lv1|1:4": "実測データ",
+  "5BR|Blue|Lv1|2:1": "毛束データ入力",
+  "5BR|Blue|Lv1|3:1": "毛束データ入力",
+  "5BR|Blue|Lv1|4:1": "毛束データ入力",
+  "5BR|Cyan|#2A2424|1:1": "毛束データ入力",
+  "5BR|Cyan|#2A2424|1:2": "毛束データ入力",
+  "5BR|Cyan|#2A2424|1:3": "毛束データ入力",
+  "5BR|Cyan|#2A2424|1:4": "毛束データ入力",
+  "5BR|Cyan|#2A2424|2:1": "毛束データ入力",
+  "5BR|Cyan|#2A2424|3:1": "毛束データ入力",
+  "5BR|Cyan|#2A2424|4:1": "毛束データ入力",
+  "5BR|Cyan|#704831|1:1": "毛束データ入力",
+  "5BR|Cyan|#704831|1:2": "毛束データ入力",
+  "5BR|Cyan|#704831|1:3": "毛束データ入力",
+  "5BR|Cyan|#704831|1:4": "毛束データ入力",
+  "5BR|Cyan|#704831|2:1": "毛束データ入力",
+  "5BR|Cyan|#704831|3:1": "毛束データ入力",
+  "5BR|Cyan|#704831|4:1": "毛束データ入力",
+  "5BR|Cyan|#C6A981|1:1": "毛束データ入力",
+  "5BR|Cyan|#C6A981|1:2": "毛束データ入力",
+  "5BR|Cyan|#C6A981|1:3": "毛束データ入力",
+  "5BR|Cyan|#C6A981|1:4": "毛束データ入力",
+  "5BR|Cyan|#C6A981|2:1": "毛束データ入力",
+  "5BR|Cyan|#C6A981|3:1": "毛束データ入力",
+  "5BR|Cyan|#C6A981|4:1": "毛束データ入力",
+  "5BR|Cyan|Lv10|1:1": "毛束データ入力",
+  "5BR|Cyan|Lv10|1:2": "毛束データ入力",
+  "5BR|Cyan|Lv10|1:3": "毛束データ入力",
+  "5BR|Cyan|Lv10|1:4": "毛束データ入力",
+  "5BR|Cyan|Lv10|2:1": "毛束データ入力",
+  "5BR|Cyan|Lv10|3:1": "毛束データ入力",
+  "5BR|Cyan|Lv10|4:1": "毛束データ入力",
+  "5BR|Cyan|Lv14|1:1": "毛束データ入力",
+  "5BR|Cyan|Lv14|1:2": "毛束データ入力",
+  "5BR|Cyan|Lv14|1:3": "毛束データ入力",
+  "5BR|Cyan|Lv14|1:4": "毛束データ入力",
+  "5BR|Cyan|Lv14|2:1": "毛束データ入力",
+  "5BR|Cyan|Lv14|3:1": "毛束データ入力",
+  "5BR|Cyan|Lv14|4:1": "毛束データ入力",
+  "5BR|Cyan|Lv1|1:1": "毛束データ入力",
+  "5BR|Cyan|Lv1|1:2": "毛束データ入力",
+  "5BR|Cyan|Lv1|1:3": "毛束データ入力",
+  "5BR|Cyan|Lv1|1:4": "毛束データ入力",
+  "5BR|Cyan|Lv1|2:1": "毛束データ入力",
+  "5BR|Cyan|Lv1|3:1": "毛束データ入力",
+  "5BR|Cyan|Lv1|4:1": "毛束データ入力",
+  "5BR|FPink|#2A2424|1:1": "毛束データ入力",
+  "5BR|FPink|#2A2424|1:2": "毛束データ入力",
+  "5BR|FPink|#2A2424|1:3": "毛束データ入力",
+  "5BR|FPink|#2A2424|1:4": "毛束データ入力",
+  "5BR|FPink|#2A2424|2:1": "毛束データ入力",
+  "5BR|FPink|#2A2424|3:1": "毛束データ入力",
+  "5BR|FPink|#2A2424|4:1": "毛束データ入力",
+  "5BR|FPink|#704831|1:1": "毛束データ入力",
+  "5BR|FPink|#704831|1:2": "毛束データ入力",
+  "5BR|FPink|#704831|1:3": "毛束データ入力",
+  "5BR|FPink|#704831|1:4": "毛束データ入力",
+  "5BR|FPink|#704831|2:1": "毛束データ入力",
+  "5BR|FPink|#704831|3:1": "毛束データ入力",
+  "5BR|FPink|#704831|4:1": "毛束データ入力",
+  "5BR|FPink|#C6A981|1:1": "毛束データ入力",
+  "5BR|FPink|#C6A981|1:2": "毛束データ入力",
+  "5BR|FPink|#C6A981|1:3": "毛束データ入力",
+  "5BR|FPink|#C6A981|1:4": "毛束データ入力",
+  "5BR|FPink|#C6A981|2:1": "毛束データ入力",
+  "5BR|FPink|#C6A981|3:1": "毛束データ入力",
+  "5BR|FPink|#C6A981|4:1": "毛束データ入力",
+  "5BR|FPink|Lv10|1:1": "毛束データ入力",
+  "5BR|FPink|Lv10|1:2": "毛束データ入力",
+  "5BR|FPink|Lv10|1:3": "毛束データ入力",
+  "5BR|FPink|Lv10|1:4": "毛束データ入力",
+  "5BR|FPink|Lv10|2:1": "毛束データ入力",
+  "5BR|FPink|Lv10|3:1": "毛束データ入力",
+  "5BR|FPink|Lv10|4:1": "毛束データ入力",
+  "5BR|FPink|Lv14|1:1": "毛束データ入力",
+  "5BR|FPink|Lv14|1:2": "毛束データ入力",
+  "5BR|FPink|Lv14|1:3": "毛束データ入力",
+  "5BR|FPink|Lv14|1:4": "毛束データ入力",
+  "5BR|FPink|Lv14|2:1": "毛束データ入力",
+  "5BR|FPink|Lv14|3:1": "毛束データ入力",
+  "5BR|FPink|Lv14|4:1": "毛束データ入力",
+  "5BR|FPink|Lv1|1:1": "毛束データ入力",
+  "5BR|FPink|Lv1|1:2": "毛束データ入力",
+  "5BR|FPink|Lv1|1:3": "毛束データ入力",
+  "5BR|FPink|Lv1|1:4": "毛束データ入力",
+  "5BR|FPink|Lv1|2:1": "毛束データ入力",
+  "5BR|FPink|Lv1|3:1": "毛束データ入力",
+  "5BR|FPink|Lv1|4:1": "毛束データ入力",
+  "5BR|Green|#2A2424|1:1": "毛束データ入力",
+  "5BR|Green|#2A2424|1:2": "毛束データ入力",
+  "5BR|Green|#2A2424|1:3": "毛束データ入力",
+  "5BR|Green|#2A2424|1:4": "毛束データ入力",
+  "5BR|Green|#2A2424|2:1": "毛束データ入力",
+  "5BR|Green|#2A2424|3:1": "毛束データ入力",
+  "5BR|Green|#2A2424|4:1": "毛束データ入力",
+  "5BR|Green|#704831|1:1": "毛束データ入力",
+  "5BR|Green|#704831|1:2": "毛束データ入力",
+  "5BR|Green|#704831|1:3": "毛束データ入力",
+  "5BR|Green|#704831|1:4": "毛束データ入力",
+  "5BR|Green|#704831|2:1": "毛束データ入力",
+  "5BR|Green|#704831|3:1": "毛束データ入力",
+  "5BR|Green|#704831|4:1": "毛束データ入力",
+  "5BR|Green|#C6A981|1:1": "毛束データ入力",
+  "5BR|Green|#C6A981|1:2": "毛束データ入力",
+  "5BR|Green|#C6A981|1:3": "毛束データ入力",
+  "5BR|Green|#C6A981|1:4": "毛束データ入力",
+  "5BR|Green|#C6A981|2:1": "毛束データ入力",
+  "5BR|Green|#C6A981|3:1": "毛束データ入力",
+  "5BR|Green|#C6A981|4:1": "毛束データ入力",
+  "5BR|Green|Lv10|1:1": "毛束データ入力",
+  "5BR|Green|Lv10|1:2": "毛束データ入力",
+  "5BR|Green|Lv10|1:3": "毛束データ入力",
+  "5BR|Green|Lv10|1:4": "毛束データ入力",
+  "5BR|Green|Lv10|2:1": "毛束データ入力",
+  "5BR|Green|Lv10|3:1": "毛束データ入力",
+  "5BR|Green|Lv10|4:1": "毛束データ入力",
+  "5BR|Green|Lv14|1:1": "毛束データ入力",
+  "5BR|Green|Lv14|1:2": "毛束データ入力",
+  "5BR|Green|Lv14|1:3": "毛束データ入力",
+  "5BR|Green|Lv14|1:4": "毛束データ入力",
+  "5BR|Green|Lv14|2:1": "毛束データ入力",
+  "5BR|Green|Lv14|3:1": "毛束データ入力",
+  "5BR|Green|Lv14|4:1": "毛束データ入力",
+  "5BR|Green|Lv1|1:1": "毛束データ入力",
+  "5BR|Green|Lv1|1:2": "毛束データ入力",
+  "5BR|Green|Lv1|1:3": "毛束データ入力",
+  "5BR|Green|Lv1|1:4": "毛束データ入力",
+  "5BR|Green|Lv1|2:1": "毛束データ入力",
+  "5BR|Green|Lv1|3:1": "毛束データ入力",
+  "5BR|Green|Lv1|4:1": "毛束データ入力",
+  "5BR|Orange|#2A2424|1:1": "毛束データ入力",
+  "5BR|Orange|#2A2424|1:2": "毛束データ入力",
+  "5BR|Orange|#2A2424|1:3": "毛束データ入力",
+  "5BR|Orange|#2A2424|1:4": "毛束データ入力",
+  "5BR|Orange|#2A2424|2:1": "毛束データ入力",
+  "5BR|Orange|#2A2424|3:1": "毛束データ入力",
+  "5BR|Orange|#2A2424|4:1": "毛束データ入力",
+  "5BR|Orange|#704831|1:1": "毛束データ入力",
+  "5BR|Orange|#704831|1:2": "毛束データ入力",
+  "5BR|Orange|#704831|1:3": "毛束データ入力",
+  "5BR|Orange|#704831|1:4": "毛束データ入力",
+  "5BR|Orange|#704831|2:1": "毛束データ入力",
+  "5BR|Orange|#704831|3:1": "毛束データ入力",
+  "5BR|Orange|#704831|4:1": "毛束データ入力",
+  "5BR|Orange|#C6A981|1:1": "毛束データ入力",
+  "5BR|Orange|#C6A981|1:2": "毛束データ入力",
+  "5BR|Orange|#C6A981|1:3": "毛束データ入力",
+  "5BR|Orange|#C6A981|1:4": "毛束データ入力",
+  "5BR|Orange|#C6A981|2:1": "毛束データ入力",
+  "5BR|Orange|#C6A981|3:1": "毛束データ入力",
+  "5BR|Orange|#C6A981|4:1": "毛束データ入力",
+  "5BR|Orange|Lv10|1:1": "毛束データ入力",
+  "5BR|Orange|Lv10|1:2": "毛束データ入力",
+  "5BR|Orange|Lv10|1:3": "毛束データ入力",
+  "5BR|Orange|Lv10|1:4": "毛束データ入力",
+  "5BR|Orange|Lv10|2:1": "毛束データ入力",
+  "5BR|Orange|Lv10|3:1": "毛束データ入力",
+  "5BR|Orange|Lv10|4:1": "毛束データ入力",
+  "5BR|Orange|Lv14|1:1": "毛束データ入力",
+  "5BR|Orange|Lv14|1:2": "毛束データ入力",
+  "5BR|Orange|Lv14|1:3": "毛束データ入力",
+  "5BR|Orange|Lv14|1:4": "毛束データ入力",
+  "5BR|Orange|Lv14|2:1": "毛束データ入力",
+  "5BR|Orange|Lv14|3:1": "毛束データ入力",
+  "5BR|Orange|Lv14|4:1": "毛束データ入力",
+  "5BR|Orange|Lv1|1:1": "毛束データ入力",
+  "5BR|Orange|Lv1|1:2": "毛束データ入力",
+  "5BR|Orange|Lv1|1:3": "毛束データ入力",
+  "5BR|Orange|Lv1|1:4": "毛束データ入力",
+  "5BR|Orange|Lv1|2:1": "毛束データ入力",
+  "5BR|Orange|Lv1|3:1": "毛束データ入力",
+  "5BR|Orange|Lv1|4:1": "毛束データ入力",
+  "5BR|Red|#2A2424|1:1": "毛束データ入力",
+  "5BR|Red|#2A2424|1:2": "毛束データ入力",
+  "5BR|Red|#2A2424|1:3": "毛束データ入力",
+  "5BR|Red|#2A2424|1:4": "毛束データ入力",
+  "5BR|Red|#2A2424|2:1": "毛束データ入力",
+  "5BR|Red|#2A2424|3:1": "毛束データ入力",
+  "5BR|Red|#2A2424|4:1": "毛束データ入力",
+  "5BR|Red|#704831|1:1": "毛束データ入力",
+  "5BR|Red|#704831|1:2": "毛束データ入力",
+  "5BR|Red|#704831|1:3": "毛束データ入力",
+  "5BR|Red|#704831|1:4": "毛束データ入力",
+  "5BR|Red|#704831|2:1": "毛束データ入力",
+  "5BR|Red|#704831|3:1": "毛束データ入力",
+  "5BR|Red|#704831|4:1": "毛束データ入力",
+  "5BR|Red|#C6A981|1:1": "毛束データ入力",
+  "5BR|Red|#C6A981|1:2": "毛束データ入力",
+  "5BR|Red|#C6A981|1:3": "毛束データ入力",
+  "5BR|Red|#C6A981|1:4": "毛束データ入力",
+  "5BR|Red|#C6A981|2:1": "毛束データ入力",
+  "5BR|Red|#C6A981|3:1": "毛束データ入力",
+  "5BR|Red|#C6A981|4:1": "毛束データ入力",
+  "5BR|Red|Lv10|1:1": "毛束データ入力",
+  "5BR|Red|Lv10|1:2": "毛束データ入力",
+  "5BR|Red|Lv10|1:3": "毛束データ入力",
+  "5BR|Red|Lv10|1:4": "毛束データ入力",
+  "5BR|Red|Lv10|2:1": "毛束データ入力",
+  "5BR|Red|Lv10|3:1": "毛束データ入力",
+  "5BR|Red|Lv10|4:1": "毛束データ入力",
+  "5BR|Red|Lv14|1:1": "毛束データ入力",
+  "5BR|Red|Lv14|1:2": "毛束データ入力",
+  "5BR|Red|Lv14|1:3": "毛束データ入力",
+  "5BR|Red|Lv14|1:4": "毛束データ入力",
+  "5BR|Red|Lv14|2:1": "毛束データ入力",
+  "5BR|Red|Lv14|3:1": "毛束データ入力",
+  "5BR|Red|Lv14|4:1": "毛束データ入力",
+  "5BR|Red|Lv1|1:1": "毛束データ入力",
+  "5BR|Red|Lv1|1:2": "毛束データ入力",
+  "5BR|Red|Lv1|1:3": "毛束データ入力",
+  "5BR|Red|Lv1|1:4": "毛束データ入力",
+  "5BR|Red|Lv1|2:1": "毛束データ入力",
+  "5BR|Red|Lv1|3:1": "毛束データ入力",
+  "5BR|Red|Lv1|4:1": "毛束データ入力",
+  "5BR|Violet|#2A2424|1:1": "毛束データ入力",
+  "5BR|Violet|#2A2424|1:2": "毛束データ入力",
+  "5BR|Violet|#2A2424|1:3": "毛束データ入力",
+  "5BR|Violet|#2A2424|1:4": "毛束データ入力",
+  "5BR|Violet|#2A2424|2:1": "毛束データ入力",
+  "5BR|Violet|#2A2424|3:1": "毛束データ入力",
+  "5BR|Violet|#2A2424|4:1": "毛束データ入力",
+  "5BR|Violet|#704831|1:1": "毛束データ入力",
+  "5BR|Violet|#704831|1:2": "毛束データ入力",
+  "5BR|Violet|#704831|1:3": "毛束データ入力",
+  "5BR|Violet|#704831|1:4": "毛束データ入力",
+  "5BR|Violet|#704831|2:1": "毛束データ入力",
+  "5BR|Violet|#704831|3:1": "毛束データ入力",
+  "5BR|Violet|#704831|4:1": "毛束データ入力",
+  "5BR|Violet|#C6A981|1:1": "毛束データ入力",
+  "5BR|Violet|#C6A981|1:2": "毛束データ入力",
+  "5BR|Violet|#C6A981|1:3": "毛束データ入力",
+  "5BR|Violet|#C6A981|1:4": "毛束データ入力",
+  "5BR|Violet|#C6A981|2:1": "毛束データ入力",
+  "5BR|Violet|#C6A981|3:1": "毛束データ入力",
+  "5BR|Violet|#C6A981|4:1": "毛束データ入力",
+  "5BR|Violet|Lv10|1:1": "毛束データ入力",
+  "5BR|Violet|Lv10|1:2": "毛束データ入力",
+  "5BR|Violet|Lv10|1:3": "毛束データ入力",
+  "5BR|Violet|Lv10|1:4": "毛束データ入力",
+  "5BR|Violet|Lv10|2:1": "毛束データ入力",
+  "5BR|Violet|Lv10|3:1": "毛束データ入力",
+  "5BR|Violet|Lv10|4:1": "毛束データ入力",
+  "5BR|Violet|Lv14|1:1": "毛束データ入力",
+  "5BR|Violet|Lv14|1:2": "毛束データ入力",
+  "5BR|Violet|Lv14|1:3": "毛束データ入力",
+  "5BR|Violet|Lv14|1:4": "毛束データ入力",
+  "5BR|Violet|Lv14|2:1": "毛束データ入力",
+  "5BR|Violet|Lv14|3:1": "毛束データ入力",
+  "5BR|Violet|Lv14|4:1": "毛束データ入力",
+  "5BR|Violet|Lv1|1:1": "毛束データ入力",
+  "5BR|Violet|Lv1|1:2": "毛束データ入力",
+  "5BR|Violet|Lv1|1:3": "毛束データ入力",
+  "5BR|Violet|Lv1|1:4": "毛束データ入力",
+  "5BR|Violet|Lv1|2:1": "毛束データ入力",
+  "5BR|Violet|Lv1|3:1": "毛束データ入力",
+  "5BR|Violet|Lv1|4:1": "毛束データ入力",
+  "7BK|Blue|#2A2424|1:1": "毛束データ入力",
+  "7BK|Blue|#2A2424|1:2": "毛束データ入力",
+  "7BK|Blue|#2A2424|1:3": "毛束データ入力",
+  "7BK|Blue|#2A2424|1:4": "毛束データ入力",
+  "7BK|Blue|#2A2424|2:1": "毛束データ入力",
+  "7BK|Blue|#2A2424|3:1": "毛束データ入力",
+  "7BK|Blue|#2A2424|4:1": "毛束データ入力",
+  "7BK|Blue|#704831|1:1": "毛束データ入力",
+  "7BK|Blue|#704831|1:2": "毛束データ入力",
+  "7BK|Blue|#704831|1:3": "毛束データ入力",
+  "7BK|Blue|#704831|1:4": "毛束データ入力",
+  "7BK|Blue|#704831|2:1": "毛束データ入力",
+  "7BK|Blue|#704831|3:1": "毛束データ入力",
+  "7BK|Blue|#704831|4:1": "毛束データ入力",
+  "7BK|Blue|#C6A981|1:1": "毛束データ入力",
+  "7BK|Blue|#C6A981|1:2": "毛束データ入力",
+  "7BK|Blue|#C6A981|1:3": "毛束データ入力",
+  "7BK|Blue|#C6A981|1:4": "毛束データ入力",
+  "7BK|Blue|#C6A981|2:1": "毛束データ入力",
+  "7BK|Blue|#C6A981|3:1": "毛束データ入力",
+  "7BK|Blue|#C6A981|4:1": "毛束データ入力",
+  "7BK|Blue|Lv10|1:1": "毛束データ入力",
+  "7BK|Blue|Lv10|1:2": "毛束データ入力",
+  "7BK|Blue|Lv10|1:3": "毛束データ入力",
+  "7BK|Blue|Lv10|1:4": "毛束データ入力",
+  "7BK|Blue|Lv10|2:1": "毛束データ入力",
+  "7BK|Blue|Lv10|3:1": "毛束データ入力",
+  "7BK|Blue|Lv10|4:1": "毛束データ入力",
+  "7BK|Blue|Lv14|1:1": "毛束データ入力",
+  "7BK|Blue|Lv14|1:2": "毛束データ入力",
+  "7BK|Blue|Lv14|1:3": "毛束データ入力",
+  "7BK|Blue|Lv14|1:4": "毛束データ入力",
+  "7BK|Blue|Lv14|2:1": "毛束データ入力",
+  "7BK|Blue|Lv14|3:1": "毛束データ入力",
+  "7BK|Blue|Lv14|4:1": "毛束データ入力",
+  "7BK|Blue|Lv1|1:1": "毛束データ入力",
+  "7BK|Blue|Lv1|1:2": "毛束データ入力",
+  "7BK|Blue|Lv1|1:3": "毛束データ入力",
+  "7BK|Blue|Lv1|1:4": "毛束データ入力",
+  "7BK|Blue|Lv1|2:1": "毛束データ入力",
+  "7BK|Blue|Lv1|3:1": "毛束データ入力",
+  "7BK|Blue|Lv1|4:1": "毛束データ入力",
+  "7BK|Cyan|#2A2424|1:1": "毛束データ入力",
+  "7BK|Cyan|#2A2424|1:2": "毛束データ入力",
+  "7BK|Cyan|#2A2424|1:3": "毛束データ入力",
+  "7BK|Cyan|#2A2424|1:4": "毛束データ入力",
+  "7BK|Cyan|#2A2424|2:1": "毛束データ入力",
+  "7BK|Cyan|#2A2424|3:1": "毛束データ入力",
+  "7BK|Cyan|#2A2424|4:1": "毛束データ入力",
+  "7BK|Cyan|#704831|1:1": "毛束データ入力",
+  "7BK|Cyan|#704831|1:2": "毛束データ入力",
+  "7BK|Cyan|#704831|1:3": "毛束データ入力",
+  "7BK|Cyan|#704831|1:4": "毛束データ入力",
+  "7BK|Cyan|#704831|2:1": "毛束データ入力",
+  "7BK|Cyan|#704831|3:1": "毛束データ入力",
+  "7BK|Cyan|#704831|4:1": "毛束データ入力",
+  "7BK|Cyan|#C6A981|1:1": "毛束データ入力",
+  "7BK|Cyan|#C6A981|1:2": "毛束データ入力",
+  "7BK|Cyan|#C6A981|1:3": "毛束データ入力",
+  "7BK|Cyan|#C6A981|1:4": "毛束データ入力",
+  "7BK|Cyan|#C6A981|2:1": "毛束データ入力",
+  "7BK|Cyan|#C6A981|3:1": "毛束データ入力",
+  "7BK|Cyan|#C6A981|4:1": "毛束データ入力",
+  "7BK|Cyan|Lv10|1:1": "毛束データ入力",
+  "7BK|Cyan|Lv10|1:2": "毛束データ入力",
+  "7BK|Cyan|Lv10|1:3": "毛束データ入力",
+  "7BK|Cyan|Lv10|1:4": "毛束データ入力",
+  "7BK|Cyan|Lv10|2:1": "毛束データ入力",
+  "7BK|Cyan|Lv10|3:1": "毛束データ入力",
+  "7BK|Cyan|Lv10|4:1": "毛束データ入力",
+  "7BK|Cyan|Lv14|1:1": "毛束データ入力",
+  "7BK|Cyan|Lv14|1:2": "毛束データ入力",
+  "7BK|Cyan|Lv14|1:3": "毛束データ入力",
+  "7BK|Cyan|Lv14|1:4": "毛束データ入力",
+  "7BK|Cyan|Lv14|2:1": "毛束データ入力",
+  "7BK|Cyan|Lv14|3:1": "毛束データ入力",
+  "7BK|Cyan|Lv14|4:1": "毛束データ入力",
+  "7BK|Cyan|Lv1|1:1": "毛束データ入力",
+  "7BK|Cyan|Lv1|1:2": "毛束データ入力",
+  "7BK|Cyan|Lv1|1:3": "毛束データ入力",
+  "7BK|Cyan|Lv1|1:4": "毛束データ入力",
+  "7BK|Cyan|Lv1|2:1": "毛束データ入力",
+  "7BK|Cyan|Lv1|3:1": "毛束データ入力",
+  "7BK|Cyan|Lv1|4:1": "毛束データ入力",
+  "7BK|FPink|#2A2424|1:1": "毛束データ入力",
+  "7BK|FPink|#2A2424|1:2": "毛束データ入力",
+  "7BK|FPink|#2A2424|1:3": "毛束データ入力",
+  "7BK|FPink|#2A2424|1:4": "毛束データ入力",
+  "7BK|FPink|#2A2424|2:1": "毛束データ入力",
+  "7BK|FPink|#2A2424|3:1": "毛束データ入力",
+  "7BK|FPink|#2A2424|4:1": "毛束データ入力",
+  "7BK|FPink|#704831|1:1": "毛束データ入力",
+  "7BK|FPink|#704831|1:2": "毛束データ入力",
+  "7BK|FPink|#704831|1:3": "毛束データ入力",
+  "7BK|FPink|#704831|1:4": "毛束データ入力",
+  "7BK|FPink|#704831|2:1": "毛束データ入力",
+  "7BK|FPink|#704831|3:1": "毛束データ入力",
+  "7BK|FPink|#704831|4:1": "毛束データ入力",
+  "7BK|FPink|#C6A981|1:1": "毛束データ入力",
+  "7BK|FPink|#C6A981|1:2": "毛束データ入力",
+  "7BK|FPink|#C6A981|1:3": "毛束データ入力",
+  "7BK|FPink|#C6A981|1:4": "毛束データ入力",
+  "7BK|FPink|#C6A981|2:1": "毛束データ入力",
+  "7BK|FPink|#C6A981|3:1": "毛束データ入力",
+  "7BK|FPink|#C6A981|4:1": "毛束データ入力",
+  "7BK|FPink|Lv10|1:1": "毛束データ入力",
+  "7BK|FPink|Lv10|1:2": "毛束データ入力",
+  "7BK|FPink|Lv10|1:3": "毛束データ入力",
+  "7BK|FPink|Lv10|1:4": "毛束データ入力",
+  "7BK|FPink|Lv10|2:1": "毛束データ入力",
+  "7BK|FPink|Lv10|3:1": "毛束データ入力",
+  "7BK|FPink|Lv10|4:1": "毛束データ入力",
+  "7BK|FPink|Lv14|1:1": "毛束データ入力",
+  "7BK|FPink|Lv14|1:2": "毛束データ入力",
+  "7BK|FPink|Lv14|1:3": "毛束データ入力",
+  "7BK|FPink|Lv14|1:4": "毛束データ入力",
+  "7BK|FPink|Lv14|2:1": "毛束データ入力",
+  "7BK|FPink|Lv14|3:1": "毛束データ入力",
+  "7BK|FPink|Lv14|4:1": "毛束データ入力",
+  "7BK|FPink|Lv1|1:1": "毛束データ入力",
+  "7BK|FPink|Lv1|1:2": "毛束データ入力",
+  "7BK|FPink|Lv1|1:3": "毛束データ入力",
+  "7BK|FPink|Lv1|1:4": "毛束データ入力",
+  "7BK|FPink|Lv1|2:1": "毛束データ入力",
+  "7BK|FPink|Lv1|3:1": "毛束データ入力",
+  "7BK|FPink|Lv1|4:1": "毛束データ入力",
+  "7BK|Gold|#2A2424|1:1": "毛束データ入力",
+  "7BK|Gold|#2A2424|1:2": "毛束データ入力",
+  "7BK|Gold|#2A2424|1:3": "毛束データ入力",
+  "7BK|Gold|#2A2424|1:4": "毛束データ入力",
+  "7BK|Gold|#2A2424|2:1": "毛束データ入力",
+  "7BK|Gold|#2A2424|3:1": "毛束データ入力",
+  "7BK|Gold|#2A2424|4:1": "毛束データ入力",
+  "7BK|Gold|#704831|1:1": "毛束データ入力",
+  "7BK|Gold|#704831|1:2": "毛束データ入力",
+  "7BK|Gold|#704831|1:3": "毛束データ入力",
+  "7BK|Gold|#704831|1:4": "毛束データ入力",
+  "7BK|Gold|#704831|2:1": "毛束データ入力",
+  "7BK|Gold|#704831|3:1": "毛束データ入力",
+  "7BK|Gold|#704831|4:1": "毛束データ入力",
+  "7BK|Gold|#C6A981|1:1": "毛束データ入力",
+  "7BK|Gold|#C6A981|1:2": "毛束データ入力",
+  "7BK|Gold|#C6A981|1:3": "毛束データ入力",
+  "7BK|Gold|#C6A981|1:4": "毛束データ入力",
+  "7BK|Gold|#C6A981|2:1": "毛束データ入力",
+  "7BK|Gold|#C6A981|3:1": "毛束データ入力",
+  "7BK|Gold|#C6A981|4:1": "毛束データ入力",
+  "7BK|Gold|Lv10|1:1": "毛束データ入力",
+  "7BK|Gold|Lv10|1:2": "毛束データ入力",
+  "7BK|Gold|Lv10|1:3": "毛束データ入力",
+  "7BK|Gold|Lv10|1:4": "毛束データ入力",
+  "7BK|Gold|Lv10|2:1": "毛束データ入力",
+  "7BK|Gold|Lv10|3:1": "毛束データ入力",
+  "7BK|Gold|Lv10|4:1": "毛束データ入力",
+  "7BK|Gold|Lv14|1:1": "毛束データ入力",
+  "7BK|Gold|Lv14|1:2": "毛束データ入力",
+  "7BK|Gold|Lv14|1:3": "毛束データ入力",
+  "7BK|Gold|Lv14|1:4": "毛束データ入力",
+  "7BK|Gold|Lv14|2:1": "毛束データ入力",
+  "7BK|Gold|Lv14|3:1": "毛束データ入力",
+  "7BK|Gold|Lv14|4:1": "毛束データ入力",
+  "7BK|Gold|Lv1|1:1": "毛束データ入力",
+  "7BK|Gold|Lv1|1:2": "毛束データ入力",
+  "7BK|Gold|Lv1|1:3": "毛束データ入力",
+  "7BK|Gold|Lv1|1:4": "毛束データ入力",
+  "7BK|Gold|Lv1|2:1": "毛束データ入力",
+  "7BK|Gold|Lv1|3:1": "毛束データ入力",
+  "7BK|Gold|Lv1|4:1": "毛束データ入力",
+  "7BK|Green|#2A2424|1:1": "毛束データ入力",
+  "7BK|Green|#2A2424|1:2": "毛束データ入力",
+  "7BK|Green|#2A2424|1:3": "毛束データ入力",
+  "7BK|Green|#2A2424|1:4": "毛束データ入力",
+  "7BK|Green|#2A2424|2:1": "毛束データ入力",
+  "7BK|Green|#2A2424|3:1": "毛束データ入力",
+  "7BK|Green|#2A2424|4:1": "毛束データ入力",
+  "7BK|Green|#704831|1:1": "毛束データ入力",
+  "7BK|Green|#704831|1:2": "毛束データ入力",
+  "7BK|Green|#704831|1:3": "毛束データ入力",
+  "7BK|Green|#704831|1:4": "毛束データ入力",
+  "7BK|Green|#704831|2:1": "毛束データ入力",
+  "7BK|Green|#704831|3:1": "毛束データ入力",
+  "7BK|Green|#704831|4:1": "毛束データ入力",
+  "7BK|Green|#C6A981|1:1": "毛束データ入力",
+  "7BK|Green|#C6A981|1:2": "毛束データ入力",
+  "7BK|Green|#C6A981|1:3": "毛束データ入力",
+  "7BK|Green|#C6A981|1:4": "毛束データ入力",
+  "7BK|Green|#C6A981|2:1": "毛束データ入力",
+  "7BK|Green|#C6A981|3:1": "毛束データ入力",
+  "7BK|Green|#C6A981|4:1": "毛束データ入力",
+  "7BK|Green|Lv10|1:1": "毛束データ入力",
+  "7BK|Green|Lv10|1:2": "毛束データ入力",
+  "7BK|Green|Lv10|1:3": "毛束データ入力",
+  "7BK|Green|Lv10|1:4": "毛束データ入力",
+  "7BK|Green|Lv10|2:1": "毛束データ入力",
+  "7BK|Green|Lv10|3:1": "毛束データ入力",
+  "7BK|Green|Lv10|4:1": "毛束データ入力",
+  "7BK|Green|Lv14|1:1": "毛束データ入力",
+  "7BK|Green|Lv14|1:2": "毛束データ入力",
+  "7BK|Green|Lv14|1:3": "毛束データ入力",
+  "7BK|Green|Lv14|1:4": "毛束データ入力",
+  "7BK|Green|Lv14|2:1": "毛束データ入力",
+  "7BK|Green|Lv14|3:1": "毛束データ入力",
+  "7BK|Green|Lv14|4:1": "毛束データ入力",
+  "7BK|Green|Lv1|1:1": "毛束データ入力",
+  "7BK|Green|Lv1|1:2": "毛束データ入力",
+  "7BK|Green|Lv1|1:3": "毛束データ入力",
+  "7BK|Green|Lv1|1:4": "毛束データ入力",
+  "7BK|Green|Lv1|2:1": "毛束データ入力",
+  "7BK|Green|Lv1|3:1": "毛束データ入力",
+  "7BK|Green|Lv1|4:1": "毛束データ入力",
+  "7BK|Lapis|#2A2424|1:1": "毛束データ入力",
+  "7BK|Lapis|#2A2424|1:2": "毛束データ入力",
+  "7BK|Lapis|#2A2424|1:3": "毛束データ入力",
+  "7BK|Lapis|#2A2424|1:4": "毛束データ入力",
+  "7BK|Lapis|#2A2424|2:1": "毛束データ入力",
+  "7BK|Lapis|#2A2424|3:1": "毛束データ入力",
+  "7BK|Lapis|#2A2424|4:1": "毛束データ入力",
+  "7BK|Lapis|#704831|1:1": "毛束データ入力",
+  "7BK|Lapis|#704831|1:2": "毛束データ入力",
+  "7BK|Lapis|#704831|1:3": "毛束データ入力",
+  "7BK|Lapis|#704831|1:4": "毛束データ入力",
+  "7BK|Lapis|#704831|2:1": "毛束データ入力",
+  "7BK|Lapis|#704831|3:1": "毛束データ入力",
+  "7BK|Lapis|#704831|4:1": "毛束データ入力",
+  "7BK|Lapis|#C6A981|1:1": "毛束データ入力",
+  "7BK|Lapis|#C6A981|1:2": "毛束データ入力",
+  "7BK|Lapis|#C6A981|1:3": "毛束データ入力",
+  "7BK|Lapis|#C6A981|1:4": "毛束データ入力",
+  "7BK|Lapis|#C6A981|2:1": "毛束データ入力",
+  "7BK|Lapis|#C6A981|3:1": "毛束データ入力",
+  "7BK|Lapis|#C6A981|4:1": "毛束データ入力",
+  "7BK|Lapis|Lv10|1:1": "毛束データ入力",
+  "7BK|Lapis|Lv10|1:2": "毛束データ入力",
+  "7BK|Lapis|Lv10|1:3": "毛束データ入力",
+  "7BK|Lapis|Lv10|1:4": "毛束データ入力",
+  "7BK|Lapis|Lv10|2:1": "毛束データ入力",
+  "7BK|Lapis|Lv10|3:1": "毛束データ入力",
+  "7BK|Lapis|Lv10|4:1": "毛束データ入力",
+  "7BK|Lapis|Lv14|1:1": "毛束データ入力",
+  "7BK|Lapis|Lv14|1:2": "毛束データ入力",
+  "7BK|Lapis|Lv14|1:3": "毛束データ入力",
+  "7BK|Lapis|Lv14|1:4": "毛束データ入力",
+  "7BK|Lapis|Lv14|2:1": "毛束データ入力",
+  "7BK|Lapis|Lv14|3:1": "毛束データ入力",
+  "7BK|Lapis|Lv14|4:1": "毛束データ入力",
+  "7BK|Lapis|Lv1|1:1": "毛束データ入力",
+  "7BK|Lapis|Lv1|1:2": "毛束データ入力",
+  "7BK|Lapis|Lv1|1:3": "毛束データ入力",
+  "7BK|Lapis|Lv1|1:4": "毛束データ入力",
+  "7BK|Lapis|Lv1|2:1": "毛束データ入力",
+  "7BK|Lapis|Lv1|3:1": "毛束データ入力",
+  "7BK|Lapis|Lv1|4:1": "毛束データ入力",
+  "7BK|Orange|#2A2424|1:1": "毛束データ入力",
+  "7BK|Orange|#2A2424|1:2": "毛束データ入力",
+  "7BK|Orange|#2A2424|1:3": "毛束データ入力",
+  "7BK|Orange|#2A2424|1:4": "毛束データ入力",
+  "7BK|Orange|#2A2424|2:1": "毛束データ入力",
+  "7BK|Orange|#2A2424|3:1": "毛束データ入力",
+  "7BK|Orange|#2A2424|4:1": "毛束データ入力",
+  "7BK|Orange|#704831|1:1": "毛束データ入力",
+  "7BK|Orange|#704831|1:2": "毛束データ入力",
+  "7BK|Orange|#704831|1:3": "毛束データ入力",
+  "7BK|Orange|#704831|1:4": "毛束データ入力",
+  "7BK|Orange|#704831|2:1": "毛束データ入力",
+  "7BK|Orange|#704831|3:1": "毛束データ入力",
+  "7BK|Orange|#704831|4:1": "毛束データ入力",
+  "7BK|Orange|#C6A981|1:1": "毛束データ入力",
+  "7BK|Orange|#C6A981|1:2": "毛束データ入力",
+  "7BK|Orange|#C6A981|1:3": "毛束データ入力",
+  "7BK|Orange|#C6A981|1:4": "毛束データ入力",
+  "7BK|Orange|#C6A981|2:1": "毛束データ入力",
+  "7BK|Orange|#C6A981|3:1": "毛束データ入力",
+  "7BK|Orange|#C6A981|4:1": "毛束データ入力",
+  "7BK|Orange|Lv10|1:1": "毛束データ入力",
+  "7BK|Orange|Lv10|1:2": "毛束データ入力",
+  "7BK|Orange|Lv10|1:3": "毛束データ入力",
+  "7BK|Orange|Lv10|1:4": "毛束データ入力",
+  "7BK|Orange|Lv10|2:1": "毛束データ入力",
+  "7BK|Orange|Lv10|3:1": "毛束データ入力",
+  "7BK|Orange|Lv10|4:1": "毛束データ入力",
+  "7BK|Orange|Lv14|1:1": "毛束データ入力",
+  "7BK|Orange|Lv14|1:2": "毛束データ入力",
+  "7BK|Orange|Lv14|1:3": "毛束データ入力",
+  "7BK|Orange|Lv14|1:4": "毛束データ入力",
+  "7BK|Orange|Lv14|2:1": "毛束データ入力",
+  "7BK|Orange|Lv14|3:1": "毛束データ入力",
+  "7BK|Orange|Lv14|4:1": "毛束データ入力",
+  "7BK|Orange|Lv1|1:1": "毛束データ入力",
+  "7BK|Orange|Lv1|1:2": "毛束データ入力",
+  "7BK|Orange|Lv1|1:3": "毛束データ入力",
+  "7BK|Orange|Lv1|1:4": "毛束データ入力",
+  "7BK|Orange|Lv1|2:1": "毛束データ入力",
+  "7BK|Orange|Lv1|3:1": "毛束データ入力",
+  "7BK|Orange|Lv1|4:1": "毛束データ入力",
+  "7BK|Red|#2A2424|1:1": "毛束データ入力",
+  "7BK|Red|#2A2424|1:2": "毛束データ入力",
+  "7BK|Red|#2A2424|1:3": "毛束データ入力",
+  "7BK|Red|#2A2424|1:4": "毛束データ入力",
+  "7BK|Red|#2A2424|2:1": "毛束データ入力",
+  "7BK|Red|#2A2424|3:1": "毛束データ入力",
+  "7BK|Red|#2A2424|4:1": "毛束データ入力",
+  "7BK|Red|#704831|1:1": "毛束データ入力",
+  "7BK|Red|#704831|1:2": "毛束データ入力",
+  "7BK|Red|#704831|1:3": "毛束データ入力",
+  "7BK|Red|#704831|1:4": "毛束データ入力",
+  "7BK|Red|#704831|2:1": "毛束データ入力",
+  "7BK|Red|#704831|3:1": "毛束データ入力",
+  "7BK|Red|#704831|4:1": "毛束データ入力",
+  "7BK|Red|#C6A981|1:1": "毛束データ入力",
+  "7BK|Red|#C6A981|1:2": "毛束データ入力",
+  "7BK|Red|#C6A981|1:3": "毛束データ入力",
+  "7BK|Red|#C6A981|1:4": "毛束データ入力",
+  "7BK|Red|#C6A981|2:1": "毛束データ入力",
+  "7BK|Red|#C6A981|3:1": "毛束データ入力",
+  "7BK|Red|#C6A981|4:1": "毛束データ入力",
+  "7BK|Red|Lv10|1:1": "毛束データ入力",
+  "7BK|Red|Lv10|1:2": "毛束データ入力",
+  "7BK|Red|Lv10|1:3": "毛束データ入力",
+  "7BK|Red|Lv10|1:4": "毛束データ入力",
+  "7BK|Red|Lv10|2:1": "毛束データ入力",
+  "7BK|Red|Lv10|3:1": "毛束データ入力",
+  "7BK|Red|Lv10|4:1": "毛束データ入力",
+  "7BK|Red|Lv14|1:1": "毛束データ入力",
+  "7BK|Red|Lv14|1:2": "毛束データ入力",
+  "7BK|Red|Lv14|1:3": "毛束データ入力",
+  "7BK|Red|Lv14|1:4": "毛束データ入力",
+  "7BK|Red|Lv14|2:1": "毛束データ入力",
+  "7BK|Red|Lv14|3:1": "毛束データ入力",
+  "7BK|Red|Lv14|4:1": "毛束データ入力",
+  "7BK|Red|Lv1|1:1": "毛束データ入力",
+  "7BK|Red|Lv1|1:2": "毛束データ入力",
+  "7BK|Red|Lv1|1:3": "毛束データ入力",
+  "7BK|Red|Lv1|1:4": "毛束データ入力",
+  "7BK|Red|Lv1|2:1": "毛束データ入力",
+  "7BK|Red|Lv1|3:1": "毛束データ入力",
+  "7BK|Red|Lv1|4:1": "毛束データ入力",
+  "7BK|Violet|#2A2424|1:1": "毛束データ入力",
+  "7BK|Violet|#2A2424|1:2": "毛束データ入力",
+  "7BK|Violet|#2A2424|1:3": "毛束データ入力",
+  "7BK|Violet|#2A2424|1:4": "毛束データ入力",
+  "7BK|Violet|#2A2424|2:1": "毛束データ入力",
+  "7BK|Violet|#2A2424|3:1": "毛束データ入力",
+  "7BK|Violet|#2A2424|4:1": "毛束データ入力",
+  "7BK|Violet|#704831|1:1": "毛束データ入力",
+  "7BK|Violet|#704831|1:2": "毛束データ入力",
+  "7BK|Violet|#704831|1:3": "毛束データ入力",
+  "7BK|Violet|#704831|1:4": "毛束データ入力",
+  "7BK|Violet|#704831|2:1": "毛束データ入力",
+  "7BK|Violet|#704831|3:1": "毛束データ入力",
+  "7BK|Violet|#704831|4:1": "毛束データ入力",
+  "7BK|Violet|#C6A981|1:1": "毛束データ入力",
+  "7BK|Violet|#C6A981|1:2": "毛束データ入力",
+  "7BK|Violet|#C6A981|1:3": "毛束データ入力",
+  "7BK|Violet|#C6A981|1:4": "毛束データ入力",
+  "7BK|Violet|#C6A981|2:1": "毛束データ入力",
+  "7BK|Violet|#C6A981|3:1": "毛束データ入力",
+  "7BK|Violet|#C6A981|4:1": "毛束データ入力",
+  "7BK|Violet|Lv10|1:1": "毛束データ入力",
+  "7BK|Violet|Lv10|1:2": "毛束データ入力",
+  "7BK|Violet|Lv10|1:3": "毛束データ入力",
+  "7BK|Violet|Lv10|1:4": "毛束データ入力",
+  "7BK|Violet|Lv10|2:1": "毛束データ入力",
+  "7BK|Violet|Lv10|3:1": "毛束データ入力",
+  "7BK|Violet|Lv10|4:1": "毛束データ入力",
+  "7BK|Violet|Lv14|1:1": "毛束データ入力",
+  "7BK|Violet|Lv14|1:2": "毛束データ入力",
+  "7BK|Violet|Lv14|1:3": "毛束データ入力",
+  "7BK|Violet|Lv14|1:4": "毛束データ入力",
+  "7BK|Violet|Lv14|2:1": "毛束データ入力",
+  "7BK|Violet|Lv14|3:1": "毛束データ入力",
+  "7BK|Violet|Lv14|4:1": "毛束データ入力",
+  "7BK|Violet|Lv1|1:1": "毛束データ入力",
+  "7BK|Violet|Lv1|1:2": "毛束データ入力",
+  "7BK|Violet|Lv1|1:3": "毛束データ入力",
+  "7BK|Violet|Lv1|1:4": "毛束データ入力",
+  "7BK|Violet|Lv1|2:1": "毛束データ入力",
+  "7BK|Violet|Lv1|3:1": "毛束データ入力",
+  "7BK|Violet|Lv1|4:1": "毛束データ入力",
+  "7BR|Blue|#2A2424|1:1": "毛束データ入力",
+  "7BR|Blue|#2A2424|1:2": "毛束データ入力",
+  "7BR|Blue|#2A2424|1:3": "毛束データ入力",
+  "7BR|Blue|#2A2424|1:4": "毛束データ入力",
+  "7BR|Blue|#2A2424|2:1": "毛束データ入力",
+  "7BR|Blue|#2A2424|3:1": "毛束データ入力",
+  "7BR|Blue|#2A2424|4:1": "毛束データ入力",
+  "7BR|Blue|#704831|1:1": "毛束データ入力",
+  "7BR|Blue|#704831|1:2": "毛束データ入力",
+  "7BR|Blue|#704831|1:3": "毛束データ入力",
+  "7BR|Blue|#704831|1:4": "毛束データ入力",
+  "7BR|Blue|#704831|2:1": "毛束データ入力",
+  "7BR|Blue|#704831|3:1": "毛束データ入力",
+  "7BR|Blue|#704831|4:1": "毛束データ入力",
+  "7BR|Blue|Clear|#2A2424|1:9:2": "実測データ",
+  "7BR|Blue|Clear|#704831|1:9:2": "実測データ",
+  "7BR|Blue|Clear|#C6A981|1:9:2": "実測データ",
+  "7BR|Blue|Clear|Lv10|1:9:2": "実測データ",
+  "7BR|Blue|Clear|Lv14|1:9:2": "実測データ",
+  "7BR|Blue|Clear|Lv1|1:9:2": "実測データ",
+  "7BR|Blue|Lv10|1:1": "毛束データ入力",
+  "7BR|Blue|Lv10|1:2": "毛束データ入力",
+  "7BR|Blue|Lv10|1:3": "毛束データ入力",
+  "7BR|Blue|Lv10|1:4": "毛束データ入力",
+  "7BR|Blue|Lv10|2:1": "毛束データ入力",
+  "7BR|Blue|Lv10|3:1": "毛束データ入力",
+  "7BR|Blue|Lv10|4:1": "毛束データ入力",
+  "7BR|Blue|Lv1|1:1": "毛束データ入力",
+  "7BR|Blue|Lv1|1:2": "毛束データ入力",
+  "7BR|Blue|Lv1|1:3": "毛束データ入力",
+  "7BR|Blue|Lv1|1:4": "毛束データ入力",
+  "7BR|Blue|Lv1|2:1": "毛束データ入力",
+  "7BR|Blue|Lv1|3:1": "毛束データ入力",
+  "7BR|Blue|Lv1|4:1": "毛束データ入力",
+  "7BR|Clear|Green|#2A2424|1:2:9": "実測データ",
+  "7BR|Clear|Green|#704831|1:2:9": "実測データ",
+  "7BR|Clear|Green|#C6A981|1:2:9": "実測データ",
+  "7BR|Clear|Green|Lv10|1:2:9": "実測データ",
+  "7BR|Clear|Green|Lv14|1:2:9": "実測データ",
+  "7BR|Clear|Green|Lv1|1:2:9": "実測データ",
+  "7BR|Cyan|#2A2424|1:1": "毛束データ入力",
+  "7BR|Cyan|#2A2424|1:2": "毛束データ入力",
+  "7BR|Cyan|#2A2424|1:3": "毛束データ入力",
+  "7BR|Cyan|#2A2424|1:4": "毛束データ入力",
+  "7BR|Cyan|#2A2424|2:1": "毛束データ入力",
+  "7BR|Cyan|#2A2424|3:1": "毛束データ入力",
+  "7BR|Cyan|#2A2424|4:1": "毛束データ入力",
+  "7BR|Cyan|#704831|1:1": "毛束データ入力",
+  "7BR|Cyan|#704831|1:2": "毛束データ入力",
+  "7BR|Cyan|#704831|1:3": "毛束データ入力",
+  "7BR|Cyan|#704831|1:4": "毛束データ入力",
+  "7BR|Cyan|#704831|2:1": "毛束データ入力",
+  "7BR|Cyan|#704831|3:1": "毛束データ入力",
+  "7BR|Cyan|#704831|4:1": "毛束データ入力",
+  "7BR|Cyan|#C6A981|1:1": "毛束データ入力",
+  "7BR|Cyan|#C6A981|1:2": "毛束データ入力",
+  "7BR|Cyan|#C6A981|1:3": "毛束データ入力",
+  "7BR|Cyan|#C6A981|1:4": "毛束データ入力",
+  "7BR|Cyan|#C6A981|2:1": "毛束データ入力",
+  "7BR|Cyan|#C6A981|3:1": "毛束データ入力",
+  "7BR|Cyan|#C6A981|4:1": "毛束データ入力",
+  "7BR|Cyan|Lv10|1:1": "毛束データ入力",
+  "7BR|Cyan|Lv10|1:2": "毛束データ入力",
+  "7BR|Cyan|Lv10|1:3": "毛束データ入力",
+  "7BR|Cyan|Lv10|1:4": "毛束データ入力",
+  "7BR|Cyan|Lv10|2:1": "毛束データ入力",
+  "7BR|Cyan|Lv10|3:1": "毛束データ入力",
+  "7BR|Cyan|Lv10|4:1": "毛束データ入力",
+  "7BR|Cyan|Lv14|1:1": "毛束データ入力",
+  "7BR|Cyan|Lv14|1:2": "毛束データ入力",
+  "7BR|Cyan|Lv14|1:3": "毛束データ入力",
+  "7BR|Cyan|Lv14|1:4": "毛束データ入力",
+  "7BR|Cyan|Lv14|2:1": "毛束データ入力",
+  "7BR|Cyan|Lv14|3:1": "毛束データ入力",
+  "7BR|Cyan|Lv14|4:1": "毛束データ入力",
+  "7BR|Cyan|Lv1|1:1": "毛束データ入力",
+  "7BR|Cyan|Lv1|1:2": "毛束データ入力",
+  "7BR|Cyan|Lv1|1:3": "毛束データ入力",
+  "7BR|Cyan|Lv1|1:4": "毛束データ入力",
+  "7BR|Cyan|Lv1|2:1": "毛束データ入力",
+  "7BR|Cyan|Lv1|3:1": "毛束データ入力",
+  "7BR|Cyan|Lv1|4:1": "毛束データ入力",
+  "7BR|FPink|#2A2424|1:1": "毛束データ入力",
+  "7BR|FPink|#2A2424|1:2": "毛束データ入力",
+  "7BR|FPink|#2A2424|1:3": "毛束データ入力",
+  "7BR|FPink|#2A2424|1:4": "毛束データ入力",
+  "7BR|FPink|#2A2424|2:1": "毛束データ入力",
+  "7BR|FPink|#2A2424|3:1": "毛束データ入力",
+  "7BR|FPink|#2A2424|4:1": "毛束データ入力",
+  "7BR|FPink|#704831|1:1": "毛束データ入力",
+  "7BR|FPink|#704831|1:2": "毛束データ入力",
+  "7BR|FPink|#704831|1:3": "毛束データ入力",
+  "7BR|FPink|#704831|1:4": "毛束データ入力",
+  "7BR|FPink|#704831|2:1": "毛束データ入力",
+  "7BR|FPink|#704831|3:1": "毛束データ入力",
+  "7BR|FPink|#704831|4:1": "毛束データ入力",
+  "7BR|FPink|#C6A981|1:1": "毛束データ入力",
+  "7BR|FPink|#C6A981|1:2": "毛束データ入力",
+  "7BR|FPink|#C6A981|1:3": "毛束データ入力",
+  "7BR|FPink|#C6A981|1:4": "毛束データ入力",
+  "7BR|FPink|#C6A981|2:1": "毛束データ入力",
+  "7BR|FPink|#C6A981|3:1": "毛束データ入力",
+  "7BR|FPink|#C6A981|4:1": "毛束データ入力",
+  "7BR|FPink|Lv10|1:1": "毛束データ入力",
+  "7BR|FPink|Lv10|1:2": "毛束データ入力",
+  "7BR|FPink|Lv10|1:3": "毛束データ入力",
+  "7BR|FPink|Lv10|1:4": "毛束データ入力",
+  "7BR|FPink|Lv10|2:1": "毛束データ入力",
+  "7BR|FPink|Lv10|3:1": "毛束データ入力",
+  "7BR|FPink|Lv10|4:1": "毛束データ入力",
+  "7BR|FPink|Lv14|1:1": "毛束データ入力",
+  "7BR|FPink|Lv14|1:2": "毛束データ入力",
+  "7BR|FPink|Lv14|1:3": "毛束データ入力",
+  "7BR|FPink|Lv14|1:4": "毛束データ入力",
+  "7BR|FPink|Lv14|2:1": "毛束データ入力",
+  "7BR|FPink|Lv14|3:1": "毛束データ入力",
+  "7BR|FPink|Lv14|4:1": "毛束データ入力",
+  "7BR|FPink|Lv1|1:1": "毛束データ入力",
+  "7BR|FPink|Lv1|1:2": "毛束データ入力",
+  "7BR|FPink|Lv1|1:3": "毛束データ入力",
+  "7BR|FPink|Lv1|1:4": "毛束データ入力",
+  "7BR|FPink|Lv1|2:1": "毛束データ入力",
+  "7BR|FPink|Lv1|3:1": "毛束データ入力",
+  "7BR|FPink|Lv1|4:1": "毛束データ入力",
+  "7BR|Green|#2A2424|1:1": "毛束データ入力",
+  "7BR|Green|#2A2424|1:2": "毛束データ入力",
+  "7BR|Green|#2A2424|1:3": "毛束データ入力",
+  "7BR|Green|#2A2424|1:4": "毛束データ入力",
+  "7BR|Green|#2A2424|2:1": "毛束データ入力",
+  "7BR|Green|#2A2424|3:1": "毛束データ入力",
+  "7BR|Green|#2A2424|4:1": "毛束データ入力",
+  "7BR|Green|#704831|1:1": "毛束データ入力",
+  "7BR|Green|#704831|1:2": "毛束データ入力",
+  "7BR|Green|#704831|1:3": "毛束データ入力",
+  "7BR|Green|#704831|1:4": "毛束データ入力",
+  "7BR|Green|#704831|2:1": "毛束データ入力",
+  "7BR|Green|#704831|3:1": "毛束データ入力",
+  "7BR|Green|#704831|4:1": "毛束データ入力",
+  "7BR|Green|#C6A981|1:1": "毛束データ入力",
+  "7BR|Green|#C6A981|1:2": "毛束データ入力",
+  "7BR|Green|#C6A981|1:3": "毛束データ入力",
+  "7BR|Green|#C6A981|1:4": "毛束データ入力",
+  "7BR|Green|#C6A981|2:1": "毛束データ入力",
+  "7BR|Green|#C6A981|3:1": "毛束データ入力",
+  "7BR|Green|#C6A981|4:1": "毛束データ入力",
+  "7BR|Green|Lv10|1:1": "毛束データ入力",
+  "7BR|Green|Lv10|1:2": "毛束データ入力",
+  "7BR|Green|Lv10|1:3": "毛束データ入力",
+  "7BR|Green|Lv10|1:4": "毛束データ入力",
+  "7BR|Green|Lv10|2:1": "毛束データ入力",
+  "7BR|Green|Lv10|3:1": "毛束データ入力",
+  "7BR|Green|Lv10|4:1": "毛束データ入力",
+  "7BR|Green|Lv14|1:1": "毛束データ入力",
+  "7BR|Green|Lv14|1:2": "毛束データ入力",
+  "7BR|Green|Lv14|1:3": "毛束データ入力",
+  "7BR|Green|Lv14|1:4": "毛束データ入力",
+  "7BR|Green|Lv14|2:1": "毛束データ入力",
+  "7BR|Green|Lv14|3:1": "毛束データ入力",
+  "7BR|Green|Lv14|4:1": "毛束データ入力",
+  "7BR|Green|Lv1|1:1": "毛束データ入力",
+  "7BR|Green|Lv1|1:2": "毛束データ入力",
+  "7BR|Green|Lv1|1:3": "毛束データ入力",
+  "7BR|Green|Lv1|1:4": "毛束データ入力",
+  "7BR|Green|Lv1|2:1": "毛束データ入力",
+  "7BR|Green|Lv1|3:1": "毛束データ入力",
+  "7BR|Green|Lv1|4:1": "毛束データ入力",
+  "7BR|Orange|#2A2424|1:1": "毛束データ入力",
+  "7BR|Orange|#2A2424|1:2": "毛束データ入力",
+  "7BR|Orange|#2A2424|1:3": "毛束データ入力",
+  "7BR|Orange|#2A2424|1:4": "毛束データ入力",
+  "7BR|Orange|#2A2424|2:1": "毛束データ入力",
+  "7BR|Orange|#2A2424|3:1": "毛束データ入力",
+  "7BR|Orange|#2A2424|4:1": "毛束データ入力",
+  "7BR|Orange|#704831|1:1": "毛束データ入力",
+  "7BR|Orange|#704831|1:2": "毛束データ入力",
+  "7BR|Orange|#704831|1:3": "毛束データ入力",
+  "7BR|Orange|#704831|1:4": "毛束データ入力",
+  "7BR|Orange|#704831|2:1": "毛束データ入力",
+  "7BR|Orange|#704831|3:1": "毛束データ入力",
+  "7BR|Orange|#704831|4:1": "毛束データ入力",
+  "7BR|Orange|#C6A981|1:1": "毛束データ入力",
+  "7BR|Orange|#C6A981|1:2": "毛束データ入力",
+  "7BR|Orange|#C6A981|1:3": "毛束データ入力",
+  "7BR|Orange|#C6A981|1:4": "毛束データ入力",
+  "7BR|Orange|#C6A981|2:1": "毛束データ入力",
+  "7BR|Orange|#C6A981|3:1": "毛束データ入力",
+  "7BR|Orange|#C6A981|4:1": "毛束データ入力",
+  "7BR|Orange|Lv10|1:1": "毛束データ入力",
+  "7BR|Orange|Lv10|1:2": "毛束データ入力",
+  "7BR|Orange|Lv10|1:3": "毛束データ入力",
+  "7BR|Orange|Lv10|1:4": "毛束データ入力",
+  "7BR|Orange|Lv10|2:1": "毛束データ入力",
+  "7BR|Orange|Lv10|3:1": "毛束データ入力",
+  "7BR|Orange|Lv10|4:1": "毛束データ入力",
+  "7BR|Orange|Lv14|1:1": "毛束データ入力",
+  "7BR|Orange|Lv14|1:2": "毛束データ入力",
+  "7BR|Orange|Lv14|1:3": "毛束データ入力",
+  "7BR|Orange|Lv14|1:4": "毛束データ入力",
+  "7BR|Orange|Lv14|2:1": "毛束データ入力",
+  "7BR|Orange|Lv14|3:1": "毛束データ入力",
+  "7BR|Orange|Lv14|4:1": "毛束データ入力",
+  "7BR|Orange|Lv1|1:1": "毛束データ入力",
+  "7BR|Orange|Lv1|1:2": "毛束データ入力",
+  "7BR|Orange|Lv1|1:3": "毛束データ入力",
+  "7BR|Orange|Lv1|1:4": "毛束データ入力",
+  "7BR|Orange|Lv1|2:1": "毛束データ入力",
+  "7BR|Orange|Lv1|3:1": "毛束データ入力",
+  "7BR|Orange|Lv1|4:1": "毛束データ入力",
+  "7BR|Red|#2A2424|1:1": "毛束データ入力",
+  "7BR|Red|#2A2424|1:2": "毛束データ入力",
+  "7BR|Red|#2A2424|1:3": "毛束データ入力",
+  "7BR|Red|#2A2424|1:4": "毛束データ入力",
+  "7BR|Red|#2A2424|2:1": "毛束データ入力",
+  "7BR|Red|#2A2424|3:1": "毛束データ入力",
+  "7BR|Red|#2A2424|4:1": "毛束データ入力",
+  "7BR|Red|#704831|1:1": "毛束データ入力",
+  "7BR|Red|#704831|1:2": "毛束データ入力",
+  "7BR|Red|#704831|1:3": "毛束データ入力",
+  "7BR|Red|#704831|1:4": "毛束データ入力",
+  "7BR|Red|#704831|2:1": "毛束データ入力",
+  "7BR|Red|#704831|3:1": "毛束データ入力",
+  "7BR|Red|#704831|4:1": "毛束データ入力",
+  "7BR|Red|#C6A981|1:1": "毛束データ入力",
+  "7BR|Red|#C6A981|1:2": "毛束データ入力",
+  "7BR|Red|#C6A981|1:3": "毛束データ入力",
+  "7BR|Red|#C6A981|1:4": "毛束データ入力",
+  "7BR|Red|#C6A981|2:1": "毛束データ入力",
+  "7BR|Red|#C6A981|3:1": "毛束データ入力",
+  "7BR|Red|#C6A981|4:1": "毛束データ入力",
+  "7BR|Red|Lv10|1:1": "毛束データ入力",
+  "7BR|Red|Lv10|1:2": "毛束データ入力",
+  "7BR|Red|Lv10|1:3": "毛束データ入力",
+  "7BR|Red|Lv10|1:4": "毛束データ入力",
+  "7BR|Red|Lv10|2:1": "毛束データ入力",
+  "7BR|Red|Lv10|3:1": "毛束データ入力",
+  "7BR|Red|Lv10|4:1": "毛束データ入力",
+  "7BR|Red|Lv14|1:1": "毛束データ入力",
+  "7BR|Red|Lv14|1:2": "毛束データ入力",
+  "7BR|Red|Lv14|1:3": "毛束データ入力",
+  "7BR|Red|Lv14|1:4": "毛束データ入力",
+  "7BR|Red|Lv14|2:1": "毛束データ入力",
+  "7BR|Red|Lv14|3:1": "毛束データ入力",
+  "7BR|Red|Lv14|4:1": "毛束データ入力",
+  "7BR|Red|Lv1|1:1": "毛束データ入力",
+  "7BR|Red|Lv1|1:2": "毛束データ入力",
+  "7BR|Red|Lv1|1:3": "毛束データ入力",
+  "7BR|Red|Lv1|1:4": "毛束データ入力",
+  "7BR|Red|Lv1|2:1": "毛束データ入力",
+  "7BR|Red|Lv1|3:1": "毛束データ入力",
+  "7BR|Red|Lv1|4:1": "毛束データ入力",
+  "7BR|Violet|#2A2424|1:1": "毛束データ入力",
+  "7BR|Violet|#2A2424|1:2": "毛束データ入力",
+  "7BR|Violet|#2A2424|1:3": "毛束データ入力",
+  "7BR|Violet|#2A2424|1:4": "毛束データ入力",
+  "7BR|Violet|#2A2424|2:1": "毛束データ入力",
+  "7BR|Violet|#2A2424|3:1": "毛束データ入力",
+  "7BR|Violet|#2A2424|4:1": "毛束データ入力",
+  "7BR|Violet|#704831|1:1": "毛束データ入力",
+  "7BR|Violet|#704831|1:2": "毛束データ入力",
+  "7BR|Violet|#704831|1:3": "毛束データ入力",
+  "7BR|Violet|#704831|1:4": "毛束データ入力",
+  "7BR|Violet|#704831|2:1": "毛束データ入力",
+  "7BR|Violet|#704831|3:1": "毛束データ入力",
+  "7BR|Violet|#704831|4:1": "毛束データ入力",
+  "7BR|Violet|#C6A981|1:1": "毛束データ入力",
+  "7BR|Violet|#C6A981|1:2": "毛束データ入力",
+  "7BR|Violet|#C6A981|1:3": "毛束データ入力",
+  "7BR|Violet|#C6A981|1:4": "毛束データ入力",
+  "7BR|Violet|#C6A981|2:1": "毛束データ入力",
+  "7BR|Violet|#C6A981|3:1": "毛束データ入力",
+  "7BR|Violet|#C6A981|4:1": "毛束データ入力",
+  "7BR|Violet|Lv10|1:1": "毛束データ入力",
+  "7BR|Violet|Lv10|1:2": "毛束データ入力",
+  "7BR|Violet|Lv10|1:3": "毛束データ入力",
+  "7BR|Violet|Lv10|1:4": "毛束データ入力",
+  "7BR|Violet|Lv10|2:1": "毛束データ入力",
+  "7BR|Violet|Lv10|3:1": "毛束データ入力",
+  "7BR|Violet|Lv10|4:1": "毛束データ入力",
+  "7BR|Violet|Lv14|1:1": "毛束データ入力",
+  "7BR|Violet|Lv14|1:2": "毛束データ入力",
+  "7BR|Violet|Lv14|1:3": "毛束データ入力",
+  "7BR|Violet|Lv14|1:4": "毛束データ入力",
+  "7BR|Violet|Lv14|2:1": "毛束データ入力",
+  "7BR|Violet|Lv14|3:1": "毛束データ入力",
+  "7BR|Violet|Lv14|4:1": "毛束データ入力",
+  "7BR|Violet|Lv1|1:1": "毛束データ入力",
+  "7BR|Violet|Lv1|1:2": "毛束データ入力",
+  "7BR|Violet|Lv1|1:3": "毛束データ入力",
+  "7BR|Violet|Lv1|1:4": "毛束データ入力",
+  "7BR|Violet|Lv1|2:1": "毛束データ入力",
+  "7BR|Violet|Lv1|3:1": "毛束データ入力",
+  "7BR|Violet|Lv1|4:1": "毛束データ入力",
+  "9BK|Blue|#2A2424|1:1": "毛束データ入力",
+  "9BK|Blue|#2A2424|1:2": "毛束データ入力",
+  "9BK|Blue|#2A2424|1:3": "毛束データ入力",
+  "9BK|Blue|#2A2424|1:4": "毛束データ入力",
+  "9BK|Blue|#2A2424|2:1": "毛束データ入力",
+  "9BK|Blue|#2A2424|3:1": "毛束データ入力",
+  "9BK|Blue|#2A2424|4:1": "毛束データ入力",
+  "9BK|Blue|#704831|1:1": "毛束データ入力",
+  "9BK|Blue|#704831|1:2": "毛束データ入力",
+  "9BK|Blue|#704831|1:3": "毛束データ入力",
+  "9BK|Blue|#704831|1:4": "毛束データ入力",
+  "9BK|Blue|#704831|2:1": "毛束データ入力",
+  "9BK|Blue|#704831|3:1": "毛束データ入力",
+  "9BK|Blue|#704831|4:1": "毛束データ入力",
+  "9BK|Blue|#C6A981|1:1": "毛束データ入力",
+  "9BK|Blue|#C6A981|1:2": "毛束データ入力",
+  "9BK|Blue|#C6A981|1:3": "毛束データ入力",
+  "9BK|Blue|#C6A981|1:4": "毛束データ入力",
+  "9BK|Blue|#C6A981|2:1": "毛束データ入力",
+  "9BK|Blue|#C6A981|3:1": "毛束データ入力",
+  "9BK|Blue|#C6A981|4:1": "毛束データ入力",
+  "9BK|Blue|Lv10|1:1": "毛束データ入力",
+  "9BK|Blue|Lv10|1:2": "毛束データ入力",
+  "9BK|Blue|Lv10|1:3": "毛束データ入力",
+  "9BK|Blue|Lv10|1:4": "毛束データ入力",
+  "9BK|Blue|Lv10|2:1": "毛束データ入力",
+  "9BK|Blue|Lv10|3:1": "毛束データ入力",
+  "9BK|Blue|Lv10|4:1": "毛束データ入力",
+  "9BK|Blue|Lv14|1:1": "毛束データ入力",
+  "9BK|Blue|Lv14|1:2": "毛束データ入力",
+  "9BK|Blue|Lv14|1:3": "毛束データ入力",
+  "9BK|Blue|Lv14|1:4": "毛束データ入力",
+  "9BK|Blue|Lv14|2:1": "毛束データ入力",
+  "9BK|Blue|Lv14|3:1": "毛束データ入力",
+  "9BK|Blue|Lv14|4:1": "毛束データ入力",
+  "9BK|Blue|Lv1|1:1": "毛束データ入力",
+  "9BK|Blue|Lv1|1:2": "毛束データ入力",
+  "9BK|Blue|Lv1|1:3": "毛束データ入力",
+  "9BK|Blue|Lv1|1:4": "毛束データ入力",
+  "9BK|Blue|Lv1|2:1": "毛束データ入力",
+  "9BK|Blue|Lv1|3:1": "毛束データ入力",
+  "9BK|Blue|Lv1|4:1": "毛束データ入力",
+  "9BK|Cyan|#2A2424|1:1": "毛束データ入力",
+  "9BK|Cyan|#2A2424|1:2": "毛束データ入力",
+  "9BK|Cyan|#2A2424|1:3": "毛束データ入力",
+  "9BK|Cyan|#2A2424|1:4": "毛束データ入力",
+  "9BK|Cyan|#2A2424|2:1": "毛束データ入力",
+  "9BK|Cyan|#2A2424|3:1": "毛束データ入力",
+  "9BK|Cyan|#2A2424|4:1": "毛束データ入力",
+  "9BK|Cyan|#704831|1:1": "毛束データ入力",
+  "9BK|Cyan|#704831|1:2": "毛束データ入力",
+  "9BK|Cyan|#704831|1:3": "毛束データ入力",
+  "9BK|Cyan|#704831|1:4": "毛束データ入力",
+  "9BK|Cyan|#704831|2:1": "毛束データ入力",
+  "9BK|Cyan|#704831|3:1": "毛束データ入力",
+  "9BK|Cyan|#704831|4:1": "毛束データ入力",
+  "9BK|Cyan|#C6A981|1:1": "毛束データ入力",
+  "9BK|Cyan|#C6A981|1:2": "毛束データ入力",
+  "9BK|Cyan|#C6A981|1:3": "毛束データ入力",
+  "9BK|Cyan|#C6A981|1:4": "毛束データ入力",
+  "9BK|Cyan|#C6A981|2:1": "毛束データ入力",
+  "9BK|Cyan|#C6A981|3:1": "毛束データ入力",
+  "9BK|Cyan|#C6A981|4:1": "毛束データ入力",
+  "9BK|Cyan|Lv10|1:1": "毛束データ入力",
+  "9BK|Cyan|Lv10|1:2": "毛束データ入力",
+  "9BK|Cyan|Lv10|1:3": "毛束データ入力",
+  "9BK|Cyan|Lv10|1:4": "毛束データ入力",
+  "9BK|Cyan|Lv10|2:1": "毛束データ入力",
+  "9BK|Cyan|Lv10|3:1": "毛束データ入力",
+  "9BK|Cyan|Lv10|4:1": "毛束データ入力",
+  "9BK|Cyan|Lv14|1:1": "毛束データ入力",
+  "9BK|Cyan|Lv14|1:2": "毛束データ入力",
+  "9BK|Cyan|Lv14|1:3": "毛束データ入力",
+  "9BK|Cyan|Lv14|1:4": "毛束データ入力",
+  "9BK|Cyan|Lv14|2:1": "毛束データ入力",
+  "9BK|Cyan|Lv14|3:1": "毛束データ入力",
+  "9BK|Cyan|Lv14|4:1": "毛束データ入力",
+  "9BK|Cyan|Lv1|1:1": "毛束データ入力",
+  "9BK|Cyan|Lv1|1:2": "毛束データ入力",
+  "9BK|Cyan|Lv1|1:3": "毛束データ入力",
+  "9BK|Cyan|Lv1|1:4": "毛束データ入力",
+  "9BK|Cyan|Lv1|2:1": "毛束データ入力",
+  "9BK|Cyan|Lv1|3:1": "毛束データ入力",
+  "9BK|Cyan|Lv1|4:1": "毛束データ入力",
+  "9BK|FPink|#2A2424|1:1": "毛束データ入力",
+  "9BK|FPink|#2A2424|1:2": "毛束データ入力",
+  "9BK|FPink|#2A2424|1:3": "毛束データ入力",
+  "9BK|FPink|#2A2424|1:4": "毛束データ入力",
+  "9BK|FPink|#2A2424|2:1": "毛束データ入力",
+  "9BK|FPink|#2A2424|3:1": "毛束データ入力",
+  "9BK|FPink|#2A2424|4:1": "毛束データ入力",
+  "9BK|FPink|#704831|1:4": "毛束データ入力",
+  "9BK|FPink|#C6A981|1:1": "毛束データ入力",
+  "9BK|FPink|#C6A981|1:2": "毛束データ入力",
+  "9BK|FPink|#C6A981|1:3": "毛束データ入力",
+  "9BK|FPink|#C6A981|1:4": "毛束データ入力",
+  "9BK|FPink|#C6A981|2:1": "毛束データ入力",
+  "9BK|FPink|#C6A981|3:1": "毛束データ入力",
+  "9BK|FPink|#C6A981|4:1": "毛束データ入力",
+  "9BK|FPink|Lv10|1:4": "毛束データ入力",
+  "9BK|FPink|Lv14|1:1": "毛束データ入力",
+  "9BK|FPink|Lv14|1:2": "毛束データ入力",
+  "9BK|FPink|Lv14|1:3": "毛束データ入力",
+  "9BK|FPink|Lv14|1:4": "毛束データ入力",
+  "9BK|FPink|Lv14|2:1": "毛束データ入力",
+  "9BK|FPink|Lv14|3:1": "毛束データ入力",
+  "9BK|FPink|Lv14|4:1": "毛束データ入力",
+  "9BK|FPink|Lv1|1:1": "毛束データ入力",
+  "9BK|FPink|Lv1|1:2": "毛束データ入力",
+  "9BK|FPink|Lv1|1:3": "毛束データ入力",
+  "9BK|FPink|Lv1|1:4": "毛束データ入力",
+  "9BK|FPink|Lv1|2:1": "毛束データ入力",
+  "9BK|FPink|Lv1|3:1": "毛束データ入力",
+  "9BK|FPink|Lv1|4:1": "毛束データ入力",
+  "9BK|Gold|#2A2424|1:1": "毛束データ入力",
+  "9BK|Gold|#2A2424|1:2": "毛束データ入力",
+  "9BK|Gold|#2A2424|1:3": "毛束データ入力",
+  "9BK|Gold|#2A2424|1:4": "毛束データ入力",
+  "9BK|Gold|#2A2424|2:1": "毛束データ入力",
+  "9BK|Gold|#2A2424|3:1": "毛束データ入力",
+  "9BK|Gold|#2A2424|4:1": "毛束データ入力",
+  "9BK|Gold|#704831|1:1": "毛束データ入力",
+  "9BK|Gold|#704831|1:2": "毛束データ入力",
+  "9BK|Gold|#704831|1:3": "毛束データ入力",
+  "9BK|Gold|#704831|1:4": "毛束データ入力",
+  "9BK|Gold|#704831|2:1": "毛束データ入力",
+  "9BK|Gold|#704831|3:1": "毛束データ入力",
+  "9BK|Gold|#704831|4:1": "毛束データ入力",
+  "9BK|Gold|#C6A981|1:1": "毛束データ入力",
+  "9BK|Gold|#C6A981|1:2": "毛束データ入力",
+  "9BK|Gold|#C6A981|1:3": "毛束データ入力",
+  "9BK|Gold|#C6A981|1:4": "毛束データ入力",
+  "9BK|Gold|#C6A981|2:1": "毛束データ入力",
+  "9BK|Gold|#C6A981|3:1": "毛束データ入力",
+  "9BK|Gold|#C6A981|4:1": "毛束データ入力",
+  "9BK|Gold|Lv10|1:1": "毛束データ入力",
+  "9BK|Gold|Lv10|1:2": "毛束データ入力",
+  "9BK|Gold|Lv10|1:3": "毛束データ入力",
+  "9BK|Gold|Lv10|1:4": "毛束データ入力",
+  "9BK|Gold|Lv10|2:1": "毛束データ入力",
+  "9BK|Gold|Lv10|3:1": "毛束データ入力",
+  "9BK|Gold|Lv10|4:1": "毛束データ入力",
+  "9BK|Gold|Lv14|1:1": "毛束データ入力",
+  "9BK|Gold|Lv14|1:2": "毛束データ入力",
+  "9BK|Gold|Lv14|1:3": "毛束データ入力",
+  "9BK|Gold|Lv14|1:4": "毛束データ入力",
+  "9BK|Gold|Lv14|2:1": "毛束データ入力",
+  "9BK|Gold|Lv14|3:1": "毛束データ入力",
+  "9BK|Gold|Lv14|4:1": "毛束データ入力",
+  "9BK|Gold|Lv1|1:1": "毛束データ入力",
+  "9BK|Gold|Lv1|1:2": "毛束データ入力",
+  "9BK|Gold|Lv1|1:3": "毛束データ入力",
+  "9BK|Gold|Lv1|1:4": "毛束データ入力",
+  "9BK|Gold|Lv1|2:1": "毛束データ入力",
+  "9BK|Gold|Lv1|3:1": "毛束データ入力",
+  "9BK|Gold|Lv1|4:1": "毛束データ入力",
+  "9BK|Green|#2A2424|1:1": "毛束データ入力",
+  "9BK|Green|#2A2424|1:2": "毛束データ入力",
+  "9BK|Green|#2A2424|1:3": "毛束データ入力",
+  "9BK|Green|#2A2424|1:4": "毛束データ入力",
+  "9BK|Green|#2A2424|2:1": "毛束データ入力",
+  "9BK|Green|#2A2424|3:1": "毛束データ入力",
+  "9BK|Green|#2A2424|4:1": "毛束データ入力",
+  "9BK|Green|#704831|1:1": "毛束データ入力",
+  "9BK|Green|#704831|1:2": "毛束データ入力",
+  "9BK|Green|#704831|1:3": "毛束データ入力",
+  "9BK|Green|#704831|1:4": "毛束データ入力",
+  "9BK|Green|#704831|2:1": "毛束データ入力",
+  "9BK|Green|#704831|3:1": "毛束データ入力",
+  "9BK|Green|#704831|4:1": "毛束データ入力",
+  "9BK|Green|#C6A981|1:1": "毛束データ入力",
+  "9BK|Green|#C6A981|1:2": "毛束データ入力",
+  "9BK|Green|#C6A981|1:3": "毛束データ入力",
+  "9BK|Green|#C6A981|1:4": "毛束データ入力",
+  "9BK|Green|#C6A981|2:1": "毛束データ入力",
+  "9BK|Green|#C6A981|3:1": "毛束データ入力",
+  "9BK|Green|#C6A981|4:1": "毛束データ入力",
+  "9BK|Green|Lv10|1:1": "毛束データ入力",
+  "9BK|Green|Lv10|1:2": "毛束データ入力",
+  "9BK|Green|Lv10|1:3": "毛束データ入力",
+  "9BK|Green|Lv10|1:4": "毛束データ入力",
+  "9BK|Green|Lv10|2:1": "毛束データ入力",
+  "9BK|Green|Lv10|3:1": "毛束データ入力",
+  "9BK|Green|Lv10|4:1": "毛束データ入力",
+  "9BK|Green|Lv14|1:1": "毛束データ入力",
+  "9BK|Green|Lv14|1:2": "毛束データ入力",
+  "9BK|Green|Lv14|1:3": "毛束データ入力",
+  "9BK|Green|Lv14|1:4": "毛束データ入力",
+  "9BK|Green|Lv14|2:1": "毛束データ入力",
+  "9BK|Green|Lv14|3:1": "毛束データ入力",
+  "9BK|Green|Lv14|4:1": "毛束データ入力",
+  "9BK|Green|Lv1|1:1": "毛束データ入力",
+  "9BK|Green|Lv1|1:2": "毛束データ入力",
+  "9BK|Green|Lv1|1:3": "毛束データ入力",
+  "9BK|Green|Lv1|1:4": "毛束データ入力",
+  "9BK|Green|Lv1|2:1": "毛束データ入力",
+  "9BK|Green|Lv1|3:1": "毛束データ入力",
+  "9BK|Green|Lv1|4:1": "毛束データ入力",
+  "9BK|Lapis|#2A2424|1:1": "毛束データ入力",
+  "9BK|Lapis|#2A2424|1:2": "毛束データ入力",
+  "9BK|Lapis|#2A2424|1:3": "毛束データ入力",
+  "9BK|Lapis|#2A2424|1:4": "毛束データ入力",
+  "9BK|Lapis|#2A2424|2:1": "毛束データ入力",
+  "9BK|Lapis|#2A2424|3:1": "毛束データ入力",
+  "9BK|Lapis|#2A2424|4:1": "毛束データ入力",
+  "9BK|Lapis|#704831|1:1": "毛束データ入力",
+  "9BK|Lapis|#704831|1:2": "毛束データ入力",
+  "9BK|Lapis|#704831|1:3": "毛束データ入力",
+  "9BK|Lapis|#704831|1:4": "毛束データ入力",
+  "9BK|Lapis|#704831|2:1": "毛束データ入力",
+  "9BK|Lapis|#704831|3:1": "毛束データ入力",
+  "9BK|Lapis|#704831|4:1": "毛束データ入力",
+  "9BK|Lapis|#C6A981|1:1": "毛束データ入力",
+  "9BK|Lapis|#C6A981|1:2": "毛束データ入力",
+  "9BK|Lapis|#C6A981|1:3": "毛束データ入力",
+  "9BK|Lapis|#C6A981|1:4": "毛束データ入力",
+  "9BK|Lapis|#C6A981|2:1": "毛束データ入力",
+  "9BK|Lapis|#C6A981|3:1": "毛束データ入力",
+  "9BK|Lapis|#C6A981|4:1": "毛束データ入力",
+  "9BK|Lapis|Lv10|1:1": "毛束データ入力",
+  "9BK|Lapis|Lv10|1:2": "毛束データ入力",
+  "9BK|Lapis|Lv10|1:3": "毛束データ入力",
+  "9BK|Lapis|Lv10|1:4": "毛束データ入力",
+  "9BK|Lapis|Lv10|2:1": "毛束データ入力",
+  "9BK|Lapis|Lv10|3:1": "毛束データ入力",
+  "9BK|Lapis|Lv10|4:1": "毛束データ入力",
+  "9BK|Lapis|Lv14|1:1": "毛束データ入力",
+  "9BK|Lapis|Lv14|1:2": "毛束データ入力",
+  "9BK|Lapis|Lv14|1:3": "毛束データ入力",
+  "9BK|Lapis|Lv14|1:4": "毛束データ入力",
+  "9BK|Lapis|Lv14|2:1": "毛束データ入力",
+  "9BK|Lapis|Lv14|3:1": "毛束データ入力",
+  "9BK|Lapis|Lv14|4:1": "毛束データ入力",
+  "9BK|Lapis|Lv1|1:1": "毛束データ入力",
+  "9BK|Lapis|Lv1|1:2": "毛束データ入力",
+  "9BK|Lapis|Lv1|1:3": "毛束データ入力",
+  "9BK|Lapis|Lv1|1:4": "毛束データ入力",
+  "9BK|Lapis|Lv1|2:1": "毛束データ入力",
+  "9BK|Lapis|Lv1|3:1": "毛束データ入力",
+  "9BK|Lapis|Lv1|4:1": "毛束データ入力",
+  "9BK|Orange|#2A2424|1:1": "毛束データ入力",
+  "9BK|Orange|#2A2424|1:2": "毛束データ入力",
+  "9BK|Orange|#2A2424|1:3": "毛束データ入力",
+  "9BK|Orange|#2A2424|1:4": "毛束データ入力",
+  "9BK|Orange|#2A2424|2:1": "毛束データ入力",
+  "9BK|Orange|#2A2424|3:1": "毛束データ入力",
+  "9BK|Orange|#2A2424|4:1": "毛束データ入力",
+  "9BK|Orange|#704831|1:1": "毛束データ入力",
+  "9BK|Orange|#704831|1:2": "毛束データ入力",
+  "9BK|Orange|#704831|1:3": "毛束データ入力",
+  "9BK|Orange|#704831|1:4": "毛束データ入力",
+  "9BK|Orange|#704831|2:1": "毛束データ入力",
+  "9BK|Orange|#704831|3:1": "毛束データ入力",
+  "9BK|Orange|#704831|4:1": "毛束データ入力",
+  "9BK|Orange|#C6A981|1:1": "毛束データ入力",
+  "9BK|Orange|#C6A981|1:2": "毛束データ入力",
+  "9BK|Orange|#C6A981|1:3": "毛束データ入力",
+  "9BK|Orange|#C6A981|1:4": "毛束データ入力",
+  "9BK|Orange|#C6A981|2:1": "毛束データ入力",
+  "9BK|Orange|#C6A981|3:1": "毛束データ入力",
+  "9BK|Orange|#C6A981|4:1": "毛束データ入力",
+  "9BK|Orange|Lv10|1:1": "毛束データ入力",
+  "9BK|Orange|Lv10|1:2": "毛束データ入力",
+  "9BK|Orange|Lv10|1:3": "毛束データ入力",
+  "9BK|Orange|Lv10|1:4": "毛束データ入力",
+  "9BK|Orange|Lv10|2:1": "毛束データ入力",
+  "9BK|Orange|Lv10|3:1": "毛束データ入力",
+  "9BK|Orange|Lv10|4:1": "毛束データ入力",
+  "9BK|Orange|Lv14|1:1": "毛束データ入力",
+  "9BK|Orange|Lv14|1:2": "毛束データ入力",
+  "9BK|Orange|Lv14|1:3": "毛束データ入力",
+  "9BK|Orange|Lv14|1:4": "毛束データ入力",
+  "9BK|Orange|Lv14|2:1": "毛束データ入力",
+  "9BK|Orange|Lv14|3:1": "毛束データ入力",
+  "9BK|Orange|Lv14|4:1": "毛束データ入力",
+  "9BK|Orange|Lv1|1:1": "毛束データ入力",
+  "9BK|Orange|Lv1|1:2": "毛束データ入力",
+  "9BK|Orange|Lv1|1:3": "毛束データ入力",
+  "9BK|Orange|Lv1|1:4": "毛束データ入力",
+  "9BK|Orange|Lv1|2:1": "毛束データ入力",
+  "9BK|Orange|Lv1|3:1": "毛束データ入力",
+  "9BK|Orange|Lv1|4:1": "毛束データ入力",
+  "9BK|Red|#2A2424|1:1": "毛束データ入力",
+  "9BK|Red|#2A2424|1:2": "毛束データ入力",
+  "9BK|Red|#2A2424|1:3": "毛束データ入力",
+  "9BK|Red|#2A2424|1:4": "毛束データ入力",
+  "9BK|Red|#2A2424|2:1": "毛束データ入力",
+  "9BK|Red|#2A2424|3:1": "毛束データ入力",
+  "9BK|Red|#2A2424|4:1": "毛束データ入力",
+  "9BK|Red|#704831|1:1": "毛束データ入力",
+  "9BK|Red|#704831|1:2": "毛束データ入力",
+  "9BK|Red|#704831|1:3": "毛束データ入力",
+  "9BK|Red|#704831|1:4": "毛束データ入力",
+  "9BK|Red|#704831|2:1": "毛束データ入力",
+  "9BK|Red|#704831|3:1": "毛束データ入力",
+  "9BK|Red|#704831|4:1": "毛束データ入力",
+  "9BK|Red|#C6A981|1:1": "毛束データ入力",
+  "9BK|Red|#C6A981|1:2": "毛束データ入力",
+  "9BK|Red|#C6A981|1:3": "毛束データ入力",
+  "9BK|Red|#C6A981|1:4": "毛束データ入力",
+  "9BK|Red|#C6A981|2:1": "毛束データ入力",
+  "9BK|Red|#C6A981|3:1": "毛束データ入力",
+  "9BK|Red|#C6A981|4:1": "毛束データ入力",
+  "9BK|Red|Lv10|1:1": "毛束データ入力",
+  "9BK|Red|Lv10|1:2": "毛束データ入力",
+  "9BK|Red|Lv10|1:3": "毛束データ入力",
+  "9BK|Red|Lv10|1:4": "毛束データ入力",
+  "9BK|Red|Lv10|2:1": "毛束データ入力",
+  "9BK|Red|Lv10|3:1": "毛束データ入力",
+  "9BK|Red|Lv10|4:1": "毛束データ入力",
+  "9BK|Red|Lv14|1:1": "毛束データ入力",
+  "9BK|Red|Lv14|1:2": "毛束データ入力",
+  "9BK|Red|Lv14|1:3": "毛束データ入力",
+  "9BK|Red|Lv14|1:4": "毛束データ入力",
+  "9BK|Red|Lv14|2:1": "毛束データ入力",
+  "9BK|Red|Lv14|3:1": "毛束データ入力",
+  "9BK|Red|Lv14|4:1": "毛束データ入力",
+  "9BK|Red|Lv1|1:1": "毛束データ入力",
+  "9BK|Red|Lv1|1:2": "毛束データ入力",
+  "9BK|Red|Lv1|1:3": "毛束データ入力",
+  "9BK|Red|Lv1|1:4": "毛束データ入力",
+  "9BK|Red|Lv1|2:1": "毛束データ入力",
+  "9BK|Red|Lv1|3:1": "毛束データ入力",
+  "9BK|Red|Lv1|4:1": "毛束データ入力",
+  "9BK|Violet|#2A2424|1:1": "毛束データ入力",
+  "9BK|Violet|#2A2424|1:2": "毛束データ入力",
+  "9BK|Violet|#2A2424|1:3": "毛束データ入力",
+  "9BK|Violet|#2A2424|1:4": "毛束データ入力",
+  "9BK|Violet|#2A2424|2:1": "毛束データ入力",
+  "9BK|Violet|#2A2424|3:1": "毛束データ入力",
+  "9BK|Violet|#2A2424|4:1": "毛束データ入力",
+  "9BK|Violet|#704831|1:1": "毛束データ入力",
+  "9BK|Violet|#704831|1:2": "毛束データ入力",
+  "9BK|Violet|#704831|1:3": "毛束データ入力",
+  "9BK|Violet|#704831|1:4": "毛束データ入力",
+  "9BK|Violet|#704831|2:1": "毛束データ入力",
+  "9BK|Violet|#704831|3:1": "毛束データ入力",
+  "9BK|Violet|#704831|4:1": "毛束データ入力",
+  "9BK|Violet|#C6A981|1:1": "毛束データ入力",
+  "9BK|Violet|#C6A981|1:2": "毛束データ入力",
+  "9BK|Violet|#C6A981|1:3": "毛束データ入力",
+  "9BK|Violet|#C6A981|1:4": "毛束データ入力",
+  "9BK|Violet|#C6A981|2:1": "毛束データ入力",
+  "9BK|Violet|#C6A981|3:1": "毛束データ入力",
+  "9BK|Violet|#C6A981|4:1": "毛束データ入力",
+  "9BK|Violet|Lv10|1:1": "毛束データ入力",
+  "9BK|Violet|Lv10|1:2": "毛束データ入力",
+  "9BK|Violet|Lv10|1:3": "毛束データ入力",
+  "9BK|Violet|Lv10|1:4": "毛束データ入力",
+  "9BK|Violet|Lv10|2:1": "毛束データ入力",
+  "9BK|Violet|Lv10|3:1": "毛束データ入力",
+  "9BK|Violet|Lv10|4:1": "毛束データ入力",
+  "9BK|Violet|Lv14|1:1": "毛束データ入力",
+  "9BK|Violet|Lv14|1:2": "毛束データ入力",
+  "9BK|Violet|Lv14|1:3": "毛束データ入力",
+  "9BK|Violet|Lv14|1:4": "毛束データ入力",
+  "9BK|Violet|Lv14|2:1": "毛束データ入力",
+  "9BK|Violet|Lv14|3:1": "毛束データ入力",
+  "9BK|Violet|Lv14|4:1": "毛束データ入力",
+  "9BK|Violet|Lv1|1:1": "毛束データ入力",
+  "9BK|Violet|Lv1|1:2": "毛束データ入力",
+  "9BK|Violet|Lv1|1:3": "毛束データ入力",
+  "9BK|Violet|Lv1|1:4": "毛束データ入力",
+  "9BK|Violet|Lv1|2:1": "毛束データ入力",
+  "9BK|Violet|Lv1|3:1": "毛束データ入力",
+  "9BK|Violet|Lv1|4:1": "毛束データ入力",
+  "9BR|Blue|#2A2424|1:1": "毛束データ入力",
+  "9BR|Blue|#2A2424|1:2": "毛束データ入力",
+  "9BR|Blue|#2A2424|1:3": "毛束データ入力",
+  "9BR|Blue|#2A2424|1:4": "毛束データ入力",
+  "9BR|Blue|#2A2424|2:1": "毛束データ入力",
+  "9BR|Blue|#2A2424|3:1": "毛束データ入力",
+  "9BR|Blue|#2A2424|4:1": "毛束データ入力",
+  "9BR|Blue|#704831|1:1": "毛束データ入力",
+  "9BR|Blue|#704831|1:2": "毛束データ入力",
+  "9BR|Blue|#704831|1:3": "毛束データ入力",
+  "9BR|Blue|#704831|1:4": "毛束データ入力",
+  "9BR|Blue|#704831|2:1": "毛束データ入力",
+  "9BR|Blue|#704831|3:1": "毛束データ入力",
+  "9BR|Blue|#704831|4:1": "毛束データ入力",
+  "9BR|Blue|Clear|#704831|1:1:3": "実測データ",
+  "9BR|Blue|Clear|#704831|1:2:1": "実測データ",
+  "9BR|Blue|Clear|#704831|1:2:3": "実測データ",
+  "9BR|Blue|Clear|#704831|1:3:2": "実測データ",
+  "9BR|Blue|Clear|#C6A981|1:1:3": "実測データ",
+  "9BR|Blue|Clear|#C6A981|1:2:1": "実測データ",
+  "9BR|Blue|Clear|#C6A981|1:2:3": "実測データ",
+  "9BR|Blue|Clear|#C6A981|1:3:2": "実測データ",
+  "9BR|Blue|Clear|Lv10|1:1:3": "実測データ",
+  "9BR|Blue|Clear|Lv10|1:2:1": "実測データ",
+  "9BR|Blue|Clear|Lv10|1:2:3": "実測データ",
+  "9BR|Blue|Clear|Lv10|1:3:2": "実測データ",
+  "9BR|Blue|Clear|Lv14|1:1:3": "実測データ",
+  "9BR|Blue|Clear|Lv14|1:2:1": "実測データ",
+  "9BR|Blue|Clear|Lv14|1:2:3": "実測データ",
+  "9BR|Blue|Clear|Lv14|1:3:2": "実測データ",
+  "9BR|Blue|Lv10|1:1": "毛束データ入力",
+  "9BR|Blue|Lv10|1:2": "毛束データ入力",
+  "9BR|Blue|Lv10|1:3": "毛束データ入力",
+  "9BR|Blue|Lv10|1:4": "毛束データ入力",
+  "9BR|Blue|Lv10|2:1": "毛束データ入力",
+  "9BR|Blue|Lv10|3:1": "毛束データ入力",
+  "9BR|Blue|Lv10|4:1": "毛束データ入力",
+  "9BR|Blue|Lv1|1:1": "毛束データ入力",
+  "9BR|Blue|Lv1|1:2": "毛束データ入力",
+  "9BR|Blue|Lv1|1:3": "毛束データ入力",
+  "9BR|Blue|Lv1|1:4": "毛束データ入力",
+  "9BR|Blue|Lv1|2:1": "毛束データ入力",
+  "9BR|Blue|Lv1|3:1": "毛束データ入力",
+  "9BR|Blue|Lv1|4:1": "毛束データ入力",
+  "9BR|Clear|Green|#704831|1:1:2": "実測データ",
+  "9BR|Clear|Green|#704831|1:2:3": "実測データ",
+  "9BR|Clear|Green|#704831|1:3:1": "実測データ",
+  "9BR|Clear|Green|#704831|1:3:2": "実測データ",
+  "9BR|Clear|Green|#C6A981|1:1:2": "実測データ",
+  "9BR|Clear|Green|#C6A981|1:2:3": "実測データ",
+  "9BR|Clear|Green|#C6A981|1:3:1": "実測データ",
+  "9BR|Clear|Green|#C6A981|1:3:2": "実測データ",
+  "9BR|Clear|Green|Lv10|1:1:2": "実測データ",
+  "9BR|Clear|Green|Lv10|1:2:3": "実測データ",
+  "9BR|Clear|Green|Lv10|1:3:1": "実測データ",
+  "9BR|Clear|Green|Lv10|1:3:2": "実測データ",
+  "9BR|Clear|Green|Lv14|1:1:2": "実測データ",
+  "9BR|Clear|Green|Lv14|1:2:3": "実測データ",
+  "9BR|Clear|Green|Lv14|1:3:1": "実測データ",
+  "9BR|Clear|Green|Lv14|1:3:2": "実測データ",
+  "9BR|Cyan|#2A2424|1:1": "毛束データ入力",
+  "9BR|Cyan|#2A2424|1:2": "毛束データ入力",
+  "9BR|Cyan|#2A2424|1:3": "毛束データ入力",
+  "9BR|Cyan|#2A2424|1:4": "毛束データ入力",
+  "9BR|Cyan|#2A2424|2:1": "毛束データ入力",
+  "9BR|Cyan|#2A2424|3:1": "毛束データ入力",
+  "9BR|Cyan|#2A2424|4:1": "毛束データ入力",
+  "9BR|Cyan|#704831|1:1": "毛束データ入力",
+  "9BR|Cyan|#704831|1:2": "毛束データ入力",
+  "9BR|Cyan|#704831|1:3": "毛束データ入力",
+  "9BR|Cyan|#704831|1:4": "毛束データ入力",
+  "9BR|Cyan|#704831|2:1": "毛束データ入力",
+  "9BR|Cyan|#704831|3:1": "毛束データ入力",
+  "9BR|Cyan|#704831|4:1": "毛束データ入力",
+  "9BR|Cyan|#C6A981|1:1": "毛束データ入力",
+  "9BR|Cyan|#C6A981|1:2": "毛束データ入力",
+  "9BR|Cyan|#C6A981|1:3": "毛束データ入力",
+  "9BR|Cyan|#C6A981|1:4": "毛束データ入力",
+  "9BR|Cyan|#C6A981|2:1": "毛束データ入力",
+  "9BR|Cyan|#C6A981|3:1": "毛束データ入力",
+  "9BR|Cyan|#C6A981|4:1": "毛束データ入力",
+  "9BR|Cyan|Lv10|1:1": "毛束データ入力",
+  "9BR|Cyan|Lv10|1:2": "毛束データ入力",
+  "9BR|Cyan|Lv10|1:3": "毛束データ入力",
+  "9BR|Cyan|Lv10|1:4": "毛束データ入力",
+  "9BR|Cyan|Lv10|2:1": "毛束データ入力",
+  "9BR|Cyan|Lv10|3:1": "毛束データ入力",
+  "9BR|Cyan|Lv10|4:1": "毛束データ入力",
+  "9BR|Cyan|Lv14|1:1": "毛束データ入力",
+  "9BR|Cyan|Lv14|1:2": "毛束データ入力",
+  "9BR|Cyan|Lv14|1:3": "毛束データ入力",
+  "9BR|Cyan|Lv14|1:4": "毛束データ入力",
+  "9BR|Cyan|Lv14|2:1": "毛束データ入力",
+  "9BR|Cyan|Lv14|3:1": "毛束データ入力",
+  "9BR|Cyan|Lv14|4:1": "毛束データ入力",
+  "9BR|Cyan|Lv1|1:1": "毛束データ入力",
+  "9BR|Cyan|Lv1|1:2": "毛束データ入力",
+  "9BR|Cyan|Lv1|1:3": "毛束データ入力",
+  "9BR|Cyan|Lv1|1:4": "毛束データ入力",
+  "9BR|Cyan|Lv1|2:1": "毛束データ入力",
+  "9BR|Cyan|Lv1|3:1": "毛束データ入力",
+  "9BR|Cyan|Lv1|4:1": "毛束データ入力",
+  "9BR|FPink|#2A2424|1:1": "毛束データ入力",
+  "9BR|FPink|#2A2424|1:2": "毛束データ入力",
+  "9BR|FPink|#2A2424|1:3": "毛束データ入力",
+  "9BR|FPink|#2A2424|1:4": "毛束データ入力",
+  "9BR|FPink|#2A2424|2:1": "毛束データ入力",
+  "9BR|FPink|#2A2424|3:1": "毛束データ入力",
+  "9BR|FPink|#2A2424|4:1": "毛束データ入力",
+  "9BR|FPink|#704831|1:1": "毛束データ入力",
+  "9BR|FPink|#704831|1:2": "毛束データ入力",
+  "9BR|FPink|#704831|1:3": "毛束データ入力",
+  "9BR|FPink|#704831|1:4": "毛束データ入力",
+  "9BR|FPink|#704831|2:1": "毛束データ入力",
+  "9BR|FPink|#704831|3:1": "毛束データ入力",
+  "9BR|FPink|#704831|4:1": "毛束データ入力",
+  "9BR|FPink|#C6A981|1:1": "毛束データ入力",
+  "9BR|FPink|#C6A981|1:2": "毛束データ入力",
+  "9BR|FPink|#C6A981|1:3": "毛束データ入力",
+  "9BR|FPink|#C6A981|1:4": "毛束データ入力",
+  "9BR|FPink|#C6A981|2:1": "毛束データ入力",
+  "9BR|FPink|#C6A981|3:1": "毛束データ入力",
+  "9BR|FPink|#C6A981|4:1": "毛束データ入力",
+  "9BR|FPink|Lv10|1:1": "毛束データ入力",
+  "9BR|FPink|Lv10|1:2": "毛束データ入力",
+  "9BR|FPink|Lv10|1:3": "毛束データ入力",
+  "9BR|FPink|Lv10|1:4": "毛束データ入力",
+  "9BR|FPink|Lv10|2:1": "毛束データ入力",
+  "9BR|FPink|Lv10|3:1": "毛束データ入力",
+  "9BR|FPink|Lv10|4:1": "毛束データ入力",
+  "9BR|FPink|Lv14|1:1": "毛束データ入力",
+  "9BR|FPink|Lv14|1:2": "毛束データ入力",
+  "9BR|FPink|Lv14|1:3": "毛束データ入力",
+  "9BR|FPink|Lv14|1:4": "毛束データ入力",
+  "9BR|FPink|Lv14|2:1": "毛束データ入力",
+  "9BR|FPink|Lv14|3:1": "毛束データ入力",
+  "9BR|FPink|Lv14|4:1": "毛束データ入力",
+  "9BR|FPink|Lv1|1:1": "毛束データ入力",
+  "9BR|FPink|Lv1|1:2": "毛束データ入力",
+  "9BR|FPink|Lv1|1:3": "毛束データ入力",
+  "9BR|FPink|Lv1|1:4": "毛束データ入力",
+  "9BR|FPink|Lv1|2:1": "毛束データ入力",
+  "9BR|FPink|Lv1|3:1": "毛束データ入力",
+  "9BR|FPink|Lv1|4:1": "毛束データ入力",
+  "9BR|Green|#2A2424|1:1": "毛束データ入力",
+  "9BR|Green|#2A2424|1:2": "毛束データ入力",
+  "9BR|Green|#2A2424|1:3": "毛束データ入力",
+  "9BR|Green|#2A2424|1:4": "毛束データ入力",
+  "9BR|Green|#2A2424|2:1": "毛束データ入力",
+  "9BR|Green|#2A2424|3:1": "毛束データ入力",
+  "9BR|Green|#2A2424|4:1": "毛束データ入力",
+  "9BR|Green|#704831|1:1": "毛束データ入力",
+  "9BR|Green|#704831|1:2": "毛束データ入力",
+  "9BR|Green|#704831|1:3": "毛束データ入力",
+  "9BR|Green|#704831|1:4": "毛束データ入力",
+  "9BR|Green|#704831|2:1": "毛束データ入力",
+  "9BR|Green|#704831|3:1": "毛束データ入力",
+  "9BR|Green|#704831|4:1": "毛束データ入力",
+  "9BR|Green|#C6A981|1:1": "毛束データ入力",
+  "9BR|Green|#C6A981|1:2": "毛束データ入力",
+  "9BR|Green|#C6A981|1:3": "毛束データ入力",
+  "9BR|Green|#C6A981|1:4": "毛束データ入力",
+  "9BR|Green|#C6A981|2:1": "毛束データ入力",
+  "9BR|Green|#C6A981|3:1": "毛束データ入力",
+  "9BR|Green|#C6A981|4:1": "毛束データ入力",
+  "9BR|Green|Lv10|1:1": "毛束データ入力",
+  "9BR|Green|Lv10|1:2": "毛束データ入力",
+  "9BR|Green|Lv10|1:3": "毛束データ入力",
+  "9BR|Green|Lv10|1:4": "毛束データ入力",
+  "9BR|Green|Lv10|2:1": "毛束データ入力",
+  "9BR|Green|Lv10|3:1": "毛束データ入力",
+  "9BR|Green|Lv10|4:1": "毛束データ入力",
+  "9BR|Green|Lv14|1:1": "毛束データ入力",
+  "9BR|Green|Lv14|1:2": "毛束データ入力",
+  "9BR|Green|Lv14|1:3": "毛束データ入力",
+  "9BR|Green|Lv14|1:4": "毛束データ入力",
+  "9BR|Green|Lv14|2:1": "毛束データ入力",
+  "9BR|Green|Lv14|3:1": "毛束データ入力",
+  "9BR|Green|Lv14|4:1": "毛束データ入力",
+  "9BR|Green|Lv1|1:1": "毛束データ入力",
+  "9BR|Green|Lv1|1:2": "毛束データ入力",
+  "9BR|Green|Lv1|1:3": "毛束データ入力",
+  "9BR|Green|Lv1|1:4": "毛束データ入力",
+  "9BR|Green|Lv1|2:1": "毛束データ入力",
+  "9BR|Green|Lv1|3:1": "毛束データ入力",
+  "9BR|Green|Lv1|4:1": "毛束データ入力",
+  "9BR|Orange|#2A2424|1:1": "毛束データ入力",
+  "9BR|Orange|#2A2424|1:2": "毛束データ入力",
+  "9BR|Orange|#2A2424|1:3": "毛束データ入力",
+  "9BR|Orange|#2A2424|1:4": "毛束データ入力",
+  "9BR|Orange|#2A2424|2:1": "毛束データ入力",
+  "9BR|Orange|#2A2424|3:1": "毛束データ入力",
+  "9BR|Orange|#2A2424|4:1": "毛束データ入力",
+  "9BR|Orange|#704831|1:1": "毛束データ入力",
+  "9BR|Orange|#704831|1:2": "毛束データ入力",
+  "9BR|Orange|#704831|1:3": "毛束データ入力",
+  "9BR|Orange|#704831|1:4": "毛束データ入力",
+  "9BR|Orange|#704831|2:1": "毛束データ入力",
+  "9BR|Orange|#704831|3:1": "毛束データ入力",
+  "9BR|Orange|#704831|4:1": "毛束データ入力",
+  "9BR|Orange|#C6A981|1:1": "毛束データ入力",
+  "9BR|Orange|#C6A981|1:2": "毛束データ入力",
+  "9BR|Orange|#C6A981|1:3": "毛束データ入力",
+  "9BR|Orange|#C6A981|1:4": "毛束データ入力",
+  "9BR|Orange|#C6A981|2:1": "毛束データ入力",
+  "9BR|Orange|#C6A981|3:1": "毛束データ入力",
+  "9BR|Orange|#C6A981|4:1": "毛束データ入力",
+  "9BR|Orange|Lv10|1:1": "毛束データ入力",
+  "9BR|Orange|Lv10|1:2": "毛束データ入力",
+  "9BR|Orange|Lv10|1:3": "毛束データ入力",
+  "9BR|Orange|Lv10|1:4": "毛束データ入力",
+  "9BR|Orange|Lv10|2:1": "毛束データ入力",
+  "9BR|Orange|Lv10|3:1": "毛束データ入力",
+  "9BR|Orange|Lv10|4:1": "毛束データ入力",
+  "9BR|Orange|Lv14|1:1": "毛束データ入力",
+  "9BR|Orange|Lv14|1:2": "毛束データ入力",
+  "9BR|Orange|Lv14|1:3": "毛束データ入力",
+  "9BR|Orange|Lv14|1:4": "毛束データ入力",
+  "9BR|Orange|Lv14|2:1": "毛束データ入力",
+  "9BR|Orange|Lv14|3:1": "毛束データ入力",
+  "9BR|Orange|Lv14|4:1": "毛束データ入力",
+  "9BR|Orange|Lv1|1:1": "毛束データ入力",
+  "9BR|Orange|Lv1|1:2": "毛束データ入力",
+  "9BR|Orange|Lv1|1:3": "毛束データ入力",
+  "9BR|Orange|Lv1|1:4": "毛束データ入力",
+  "9BR|Orange|Lv1|2:1": "毛束データ入力",
+  "9BR|Orange|Lv1|3:1": "毛束データ入力",
+  "9BR|Orange|Lv1|4:1": "毛束データ入力",
+  "9BR|Red|#2A2424|1:1": "毛束データ入力",
+  "9BR|Red|#2A2424|1:2": "毛束データ入力",
+  "9BR|Red|#2A2424|1:3": "毛束データ入力",
+  "9BR|Red|#2A2424|1:4": "毛束データ入力",
+  "9BR|Red|#2A2424|2:1": "毛束データ入力",
+  "9BR|Red|#2A2424|3:1": "毛束データ入力",
+  "9BR|Red|#2A2424|4:1": "毛束データ入力",
+  "9BR|Red|#704831|1:1": "毛束データ入力",
+  "9BR|Red|#704831|1:2": "毛束データ入力",
+  "9BR|Red|#704831|1:3": "毛束データ入力",
+  "9BR|Red|#704831|1:4": "毛束データ入力",
+  "9BR|Red|#704831|2:1": "毛束データ入力",
+  "9BR|Red|#704831|3:1": "毛束データ入力",
+  "9BR|Red|#704831|4:1": "毛束データ入力",
+  "9BR|Red|#C6A981|1:1": "毛束データ入力",
+  "9BR|Red|#C6A981|1:2": "毛束データ入力",
+  "9BR|Red|#C6A981|1:3": "毛束データ入力",
+  "9BR|Red|#C6A981|1:4": "毛束データ入力",
+  "9BR|Red|#C6A981|2:1": "毛束データ入力",
+  "9BR|Red|#C6A981|3:1": "毛束データ入力",
+  "9BR|Red|#C6A981|4:1": "毛束データ入力",
+  "9BR|Red|Lv10|1:1": "毛束データ入力",
+  "9BR|Red|Lv10|1:2": "毛束データ入力",
+  "9BR|Red|Lv10|1:3": "毛束データ入力",
+  "9BR|Red|Lv10|1:4": "毛束データ入力",
+  "9BR|Red|Lv10|2:1": "毛束データ入力",
+  "9BR|Red|Lv10|3:1": "毛束データ入力",
+  "9BR|Red|Lv10|4:1": "毛束データ入力",
+  "9BR|Red|Lv14|1:1": "毛束データ入力",
+  "9BR|Red|Lv14|1:2": "毛束データ入力",
+  "9BR|Red|Lv14|1:3": "毛束データ入力",
+  "9BR|Red|Lv14|1:4": "毛束データ入力",
+  "9BR|Red|Lv14|2:1": "毛束データ入力",
+  "9BR|Red|Lv14|3:1": "毛束データ入力",
+  "9BR|Red|Lv14|4:1": "毛束データ入力",
+  "9BR|Red|Lv1|1:1": "毛束データ入力",
+  "9BR|Red|Lv1|1:2": "毛束データ入力",
+  "9BR|Red|Lv1|1:3": "毛束データ入力",
+  "9BR|Red|Lv1|1:4": "毛束データ入力",
+  "9BR|Red|Lv1|2:1": "毛束データ入力",
+  "9BR|Red|Lv1|3:1": "毛束データ入力",
+  "9BR|Red|Lv1|4:1": "毛束データ入力",
+  "9BR|Violet|#2A2424|1:1": "毛束データ入力",
+  "9BR|Violet|#2A2424|1:2": "毛束データ入力",
+  "9BR|Violet|#2A2424|1:3": "毛束データ入力",
+  "9BR|Violet|#2A2424|1:4": "毛束データ入力",
+  "9BR|Violet|#2A2424|2:1": "毛束データ入力",
+  "9BR|Violet|#2A2424|3:1": "毛束データ入力",
+  "9BR|Violet|#2A2424|4:1": "毛束データ入力",
+  "9BR|Violet|#704831|1:1": "毛束データ入力",
+  "9BR|Violet|#704831|1:2": "毛束データ入力",
+  "9BR|Violet|#704831|1:3": "毛束データ入力",
+  "9BR|Violet|#704831|1:4": "毛束データ入力",
+  "9BR|Violet|#704831|2:1": "毛束データ入力",
+  "9BR|Violet|#704831|3:1": "毛束データ入力",
+  "9BR|Violet|#704831|4:1": "毛束データ入力",
+  "9BR|Violet|#C6A981|1:1": "毛束データ入力",
+  "9BR|Violet|#C6A981|1:2": "毛束データ入力",
+  "9BR|Violet|#C6A981|1:3": "毛束データ入力",
+  "9BR|Violet|#C6A981|1:4": "毛束データ入力",
+  "9BR|Violet|#C6A981|2:1": "毛束データ入力",
+  "9BR|Violet|#C6A981|3:1": "毛束データ入力",
+  "9BR|Violet|#C6A981|4:1": "毛束データ入力",
+  "9BR|Violet|Lv10|1:1": "毛束データ入力",
+  "9BR|Violet|Lv10|1:2": "毛束データ入力",
+  "9BR|Violet|Lv10|1:3": "毛束データ入力",
+  "9BR|Violet|Lv10|1:4": "毛束データ入力",
+  "9BR|Violet|Lv10|2:1": "毛束データ入力",
+  "9BR|Violet|Lv10|3:1": "毛束データ入力",
+  "9BR|Violet|Lv10|4:1": "毛束データ入力",
+  "9BR|Violet|Lv14|1:1": "毛束データ入力",
+  "9BR|Violet|Lv14|1:2": "毛束データ入力",
+  "9BR|Violet|Lv14|1:3": "毛束データ入力",
+  "9BR|Violet|Lv14|1:4": "毛束データ入力",
+  "9BR|Violet|Lv14|2:1": "毛束データ入力",
+  "9BR|Violet|Lv14|3:1": "毛束データ入力",
+  "9BR|Violet|Lv14|4:1": "毛束データ入力",
+  "9BR|Violet|Lv1|1:1": "毛束データ入力",
+  "9BR|Violet|Lv1|1:2": "毛束データ入力",
+  "9BR|Violet|Lv1|1:3": "毛束データ入力",
+  "9BR|Violet|Lv1|1:4": "毛束データ入力",
+  "9BR|Violet|Lv1|2:1": "毛束データ入力",
+  "9BR|Violet|Lv1|3:1": "毛束データ入力",
+  "9BR|Violet|Lv1|4:1": "毛束データ入力",
+  "Blue|#2A2424|100%": "実測データ",
+  "Blue|#704831|100%": "実測データ",
+  "Blue|#C6A981|100%": "実測データ",
+  "Blue|Clear|#83633C|1:4": "実測データ",
+  "Blue|Clear|#D8CAA0|1:4": "実測データ",
+  "Blue|Clear|#E0E6E4|1:4": "実測データ",
+  "Blue|Pastel|#83633C|1:4": "実測データ",
+  "Blue|Pastel|#D8CAA0|1:4": "実測データ",
+  "Blue|Pastel|#E0E6E4|1:4": "実測データ",
+  "Clear|FPink|#83633C|4:1": "実測データ",
+  "Clear|FPink|#D8CAA0|4:1": "実測データ",
+  "Clear|FPink|#E0E6E4|4:1": "実測データ",
+  "Clear|Red|#83633C|4:1": "実測データ",
+  "Clear|Red|#D8CAA0|4:1": "実測データ",
+  "Clear|Red|#E0E6E4|4:1": "実測データ",
+  "FPink|Pastel|#83633C|1:4": "実測データ",
+  "FPink|Pastel|#D8CAA0|1:4": "実測データ",
+  "FPink|Pastel|#E0E6E4|1:4": "実測データ",
+  "Pastel|Red|#83633C|4:1": "実測データ",
+  "Pastel|Red|#D8CAA0|4:1": "実測データ",
+  "Pastel|Red|#E0E6E4|4:1": "実測データ",
+};
+
+// 初期調合レシピ
+let currentRecipe = [{ name: "Blue", gram: 10 }];
+let selectedTargetHue = "greige";
+let selectedUnevenness = "low";
+let photoImage = null;
+let photoSamples = [];
+let photoSearchResults = [];
+let selectedPhotoTargetMode = "raw";
+let manualPhotoTargetHex = null;
+let photoLightnessAdjustment = 0;
+
+const selectorHueNames = {
+  ash: "アッシュ",
+  greige: "グレージュ",
+  beige: "ベージュ",
+  pink: "ピンク",
+  red: "レッド",
+  orange: "オレンジ",
+  violet: "バイオレット",
+  blue: "ブルー",
+  green: "グリーン"
+};
+
+const selectorMainRecipes = {
+  ash: [["Blue", 2], ["Greige", 1]],
+  greige: [["Greige", 2], ["Blue", 1]],
+  beige: [["Gold", 1], ["Greige", 1]],
+  pink: [["FPink", 2], ["Red", 1]],
+  red: [["Red", 1]],
+  orange: [["Orange", 1]],
+  violet: [["Violet", 2], ["Lapis", 1]],
+  blue: [["Blue", 2], ["Cyan", 1]],
+  green: [["Green", 2], ["Cyan", 1]]
+};
+
+window.addEventListener('DOMContentLoaded', async () => {
+  try {
+    await loadPicaraData();
+  } catch (error) {
+    document.body.innerHTML = `<div class="container"><div class="card"><div class="card-title">読み込みエラー</div><p>色データの読み込みに失敗しました。</p><p style="font-size:.8rem;color:#64748b;">${error.message}</p></div></div>`;
+    return;
+  }
+  buildPalette();
+  setupEvents();
+  setupSelectorEvents();
+  setupPhotoSearch();
+  setupNavigation();
+  renderRecipe();
+  updateAllBaseToneDisplays();
+  calculateMix();
+});
+
+// OKLab色空間への変換サポート（人間の目の補正用）
+function rgbToOklab(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b;
+  const m = 0.2119034982 * r + 0.6806995451 * g + 0.1073972632 * b;
+  const s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b;
+  const l_ = Math.cbrt(l), m_ = Math.cbrt(m), s_ = Math.cbrt(s);
+  return {
+    L: 0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_,
+    a: 1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_,
+    b: 0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_
+  };
+}
+
+function oklabToRgb(L, a, b) {
+  const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
+  const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
+  const s_ = L - 0.0894841775 * a - 1.2914855480 * b;
+  const l = l_ * l_ * l_, m = m_ * m_ * m_, s = s_ * s_ * s_;
+  let r = +4.0767416621 * l - 3.3077115913 * m + 0.2309699294 * s;
+  let g = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s;
+  let b_ = -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s;
+  return {
+    r: Math.max(0, Math.min(255, r * 255)),
+    g: Math.max(0, Math.min(255, g * 255)),
+    b: Math.max(0, Math.min(255, b_ * 255))
+  };
+}
+
+function hexToRgb(hex) {
+  const v = hex.replace("#", "");
+  return { r: parseInt(v.slice(0, 2), 16), g: parseInt(v.slice(2, 4), 16), b: parseInt(v.slice(4, 6), 16) };
+}
+
+function rgbToHex(r, g, b) {
+  const toHex = v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0");
+  return "#" + toHex(r) + toHex(g) + toHex(b);
+}
+
+function buildPalette() {
+  const palette = document.getElementById("palette");
+  palette.innerHTML = "";
+  for (const name in picaraColors) {
+    const btn = document.createElement("button"); btn.className = "palette-btn";
+    const colorDot = document.createElement("div"); colorDot.className = "palette-color"; colorDot.style.backgroundColor = picaraColors[name];
+    if (name === "Clear" || name === "11BK") colorDot.style.border = "1px solid #cbd5e1";
+    const label = document.createElement("div"); label.className = "palette-label"; label.textContent = name;
+    btn.appendChild(colorDot); btn.appendChild(label);
+    btn.addEventListener("click", () => addColorToRecipe(name));
+    palette.appendChild(btn);
+  }
+}
+
+function setupEvents() {
+  document.getElementById("baseRange").addEventListener("input", (e) => {
+    e.target.value = String(normalizeBaseLevel(e.target.value));
+    updateBaseToneDisplay("baseRange", "levelBadge", "baseToneSwatch");
+    calculateMix();
+  });
+}
+
+function showScreen(screenId) {
+  document.querySelectorAll(".app-screen").forEach(screen => {
+    screen.classList.toggle("active", screen.id === screenId);
+  });
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function setupNavigation() {
+  document.getElementById("openPhotoBtn").addEventListener("click", () => {
+    showScreen("photoScreen");
+  });
+  document.getElementById("openMixerBtn").addEventListener("click", () => {
+    showScreen("mixerScreen");
+  });
+  document.querySelectorAll("[data-screen]").forEach(btn => {
+    btn.addEventListener("click", () => showScreen(btn.dataset.screen));
+  });
+  document.getElementById("editInMixerBtn").addEventListener("click", () => {
+    showScreen("mixerScreen");
+  });
+}
+
+function setupPhotoSearch() {
+  const input = document.getElementById("photoInput");
+  const canvas = document.getElementById("photoCanvas");
+  const baseRange = document.getElementById("photoBaseRange");
+
+  input.addEventListener("change", event => {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    const image = new Image();
+    image.onload = () => {
+      photoImage = image;
+      photoSamples = [];
+      selectedPhotoTargetMode = "raw";
+      manualPhotoTargetHex = null;
+      photoLightnessAdjustment = 0;
+      document.getElementById("photoLightnessRange").value = "0";
+      const maxWidth = 900;
+      const scale = Math.min(1, maxWidth / image.naturalWidth);
+      canvas.width = Math.round(image.naturalWidth * scale);
+      canvas.height = Math.round(image.naturalHeight * scale);
+      document.getElementById("photoStage").classList.add("visible");
+      drawPhotoCanvas();
+      updatePhotoTarget();
+      URL.revokeObjectURL(image.src);
+    };
+    image.src = URL.createObjectURL(file);
+  });
+
+  canvas.addEventListener("pointerdown", event => {
+    if (!photoImage) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = (event.clientX - rect.left) * canvas.width / rect.width;
+    const y = (event.clientY - rect.top) * canvas.height / rect.height;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(photoImage, 0, 0, canvas.width, canvas.height);
+    const rgb = sampleCanvasArea(x, y, 4);
+    photoSamples.push({ x, y, rgb });
+    drawPhotoCanvas();
+    updatePhotoTarget();
+  });
+
+  document.getElementById("undoSampleBtn").addEventListener("click", () => {
+    photoSamples.pop();
+    drawPhotoCanvas();
+    updatePhotoTarget();
+  });
+  document.getElementById("clearSamplesBtn").addEventListener("click", () => {
+    photoSamples = [];
+    selectedPhotoTargetMode = "raw";
+    manualPhotoTargetHex = null;
+    photoLightnessAdjustment = 0;
+    document.getElementById("manualTargetHex").value = "";
+    document.getElementById("photoLightnessRange").value = "0";
+    drawPhotoCanvas();
+    updatePhotoTarget();
+  });
+  baseRange.addEventListener("input", event => {
+    event.target.value = String(normalizeBaseLevel(event.target.value));
+    updateBaseToneDisplay("photoBaseRange", "photoBaseBadge", "photoBaseSwatch");
+  });
+  document.getElementById("searchRecipesBtn").addEventListener("click", searchPhotoRecipes);
+  document.querySelectorAll("[data-target-mode]").forEach(button => {
+    button.addEventListener("click", () => {
+      if (button.dataset.targetMode === "filtered" && photoSamples.length < 5) return;
+      selectedPhotoTargetMode = button.dataset.targetMode;
+      manualPhotoTargetHex = null;
+      updatePhotoTarget();
+    });
+  });
+  document.getElementById("applyManualTargetBtn").addEventListener("click", () => {
+    const value = document.getElementById("manualTargetHex").value.trim().toUpperCase();
+    if (!/^#[0-9A-F]{6}$/.test(value)) {
+      document.getElementById("manualTargetHex").focus();
+      return;
+    }
+    manualPhotoTargetHex = value;
+    selectedPhotoTargetMode = "manual";
+    updatePhotoTarget();
+  });
+  document.getElementById("photoLightnessRange").addEventListener("input", event => {
+    photoLightnessAdjustment = Number(event.target.value);
+    manualPhotoTargetHex = null;
+    if (selectedPhotoTargetMode === "manual") selectedPhotoTargetMode = "raw";
+    updatePhotoTarget();
+  });
+}
+
+function drawPhotoCanvas() {
+  const canvas = document.getElementById("photoCanvas");
+  if (!photoImage || !canvas.width) return;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(photoImage, 0, 0, canvas.width, canvas.height);
+  photoSamples.forEach((sample, index) => {
+    ctx.beginPath();
+    ctx.arc(sample.x, sample.y, 8, 0, Math.PI * 2);
+    ctx.fillStyle = rgbToHex(sample.rgb.r, sample.rgb.g, sample.rgb.b);
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "#FFFFFF";
+    ctx.stroke();
+    ctx.fillStyle = "#FFFFFF";
+    ctx.font = "bold 10px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(String(index + 1), sample.x, sample.y);
+  });
+}
+
+function sampleCanvasArea(x, y, radius) {
+  const canvas = document.getElementById("photoCanvas");
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  const sx = Math.max(0, Math.round(x - radius));
+  const sy = Math.max(0, Math.round(y - radius));
+  const width = Math.min(canvas.width - sx, radius * 2 + 1);
+  const height = Math.min(canvas.height - sy, radius * 2 + 1);
+  const data = ctx.getImageData(sx, sy, width, height).data;
+  const values = { r: [], g: [], b: [] };
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] < 200) continue;
+    values.r.push(data[i]);
+    values.g.push(data[i + 1]);
+    values.b.push(data[i + 2]);
+  }
+  return {
+    r: median(values.r),
+    g: median(values.g),
+    b: median(values.b)
+  };
+}
+
+function median(values) {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2
+    ? sorted[middle]
+    : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
+function getRawPhotoTargetRgb() {
+  if (!photoSamples.length) return null;
+  return {
+    r: median(photoSamples.map(sample => sample.rgb.r)),
+    g: median(photoSamples.map(sample => sample.rgb.g)),
+    b: median(photoSamples.map(sample => sample.rgb.b))
+  };
+}
+
+function getFilteredPhotoTargetRgb() {
+  if (photoSamples.length < 5) return null;
+  const raw = getRawPhotoTargetRgb();
+  if (!raw) return null;
+  const sorted = [...photoSamples].sort(
+    (a, b) => rgbLuminance(a.rgb) - rgbLuminance(b.rgb)
+  );
+  const trimCount = Math.max(1, Math.floor(sorted.length * 0.2));
+  const central = sorted.slice(trimCount, sorted.length - trimCount);
+  if (!central.length) return null;
+
+  // 影・反射の除去で目標の色味が変わらないよう、rawの色相・彩度を保持する。
+  // 外れ値を除いた中央サンプルから明るさ成分だけを採用する。
+  const rawLab = rgbToOklab(raw.r, raw.g, raw.b);
+  const centralLightness = median(
+    central.map(sample => rgbToOklab(sample.rgb.r, sample.rgb.g, sample.rgb.b).L)
+  );
+  return oklabToRgb(centralLightness, rawLab.a, rawLab.b);
+}
+
+function getPhotoTargetRgb() {
+  if (selectedPhotoTargetMode === "manual" && manualPhotoTargetHex) {
+    return hexToRgb(manualPhotoTargetHex);
+  }
+  let rgb;
+  if (selectedPhotoTargetMode === "filtered") {
+    rgb = getFilteredPhotoTargetRgb() || getRawPhotoTargetRgb();
+  } else {
+    rgb = getRawPhotoTargetRgb();
+  }
+  return applyPhotoLightness(rgb, photoLightnessAdjustment);
+}
+
+function applyPhotoLightness(rgb, amount) {
+  if (!rgb || !amount) return rgb;
+  const lab = rgbToOklab(rgb.r, rgb.g, rgb.b);
+  const adjusted = oklabToRgb(
+    Math.max(0, Math.min(1, lab.L + amount / 500)),
+    lab.a,
+    lab.b
+  );
+  return adjusted;
+}
+
+function setTargetModeActive(mode) {
+  document.querySelectorAll("[data-target-mode]").forEach(button => {
+    button.classList.toggle("active", mode !== "manual" && button.dataset.targetMode === mode);
+  });
+}
+
+function updatePhotoTarget() {
+  const rgb = getPhotoTargetRgb();
+  const rawRgb = getRawPhotoTargetRgb();
+  const filteredRgb = getFilteredPhotoTargetRgb();
+  const swatch = document.getElementById("targetColorSwatch");
+  const label = document.getElementById("targetColorHex");
+  document.getElementById("sampleCount").textContent = `選択点 ${photoSamples.length}`;
+  document.getElementById("photoLightnessLabel").textContent =
+    photoLightnessAdjustment > 0
+      ? `+${photoLightnessAdjustment}`
+      : String(photoLightnessAdjustment);
+  const rawHex = rawRgb ? rgbToHex(rawRgb.r, rawRgb.g, rawRgb.b).toUpperCase() : null;
+  const filteredHex = filteredRgb
+    ? rgbToHex(filteredRgb.r, filteredRgb.g, filteredRgb.b).toUpperCase()
+    : null;
+  document.getElementById("rawModeSwatch").style.backgroundColor = rawHex || "#FFFFFF";
+  document.getElementById("rawModeHex").textContent = rawHex || "—";
+  document.getElementById("filteredModeSwatch").style.backgroundColor = filteredHex || "#FFFFFF";
+  document.getElementById("filteredModeHex").textContent = filteredHex || "5点以上で算出";
+  document.getElementById("filteredTargetBtn").disabled = !filteredHex;
+
+  if (selectedPhotoTargetMode === "filtered" && !filteredHex) {
+    selectedPhotoTargetMode = "raw";
+  }
+  setTargetModeActive(selectedPhotoTargetMode);
+  if (!rgb) {
+    swatch.style.backgroundColor = "#FFFFFF";
+    label.textContent = "未選択";
+    document.getElementById("reverseResults").innerHTML = "";
+    return;
+  }
+  const hex = rgbToHex(rgb.r, rgb.g, rgb.b).toUpperCase();
+  swatch.style.backgroundColor = hex;
+  const modeNames = { raw: "そのまま", filtered: "影・反射除外・色味保持", manual: "手入力" };
+  label.textContent = `${hex}（${modeNames[selectedPhotoTargetMode]}）`;
+}
+
+function colorDistanceOklab(hexA, hexB) {
+  const aRgb = hexToRgb(hexA);
+  const bRgb = hexToRgb(hexB);
+  const a = rgbToOklab(aRgb.r, aRgb.g, aRgb.b);
+  const b = rgbToOklab(bRgb.r, bRgb.g, bRgb.b);
+  const dL = (a.L - b.L) * 1.35;
+  const da = a.a - b.a;
+  const db = a.b - b.b;
+  return Math.sqrt(dL * dL + da * da + db * db);
+}
+
+function recipeComplexityPenalty(recipe) {
+  if (recipe.length <= 1) return 0;
+  const grams = recipe.map(item => item.gram).filter(gram => gram > 0);
+  const minGram = Math.min(...grams);
+  const normalized = grams.map(gram => gram / minGram);
+  const ratioSpread = Math.max(...normalized) - Math.min(...normalized);
+
+  // 写真には撮影誤差があるため、色差が僅差なら再現しやすい単色を優先する。
+  // 比率差が大きい2色配合には、ごく小さな追加ペナルティを与える。
+  return 0.016 + ratioSpread * 0.0008;
+}
+
+function createPhotoCandidate(recipe, result, targetHex) {
+  const distance = colorDistanceOklab(targetHex, result.hex);
+  return {
+    recipe,
+    hex: result.hex,
+    distance,
+    score: distance + recipeComplexityPenalty(recipe),
+    source: result.source
+  };
+}
+
+function evaluateRecipeAtLevel(recipe, lv) {
+  const previousRecipe = currentRecipe;
+  currentRecipe = recipe.map(item => ({ ...item }));
+  const total = currentRecipe.reduce((sum, item) => sum + item.gram, 0);
+  const result = calculateHairResult(lv, total);
+  currentRecipe = previousRecipe;
+  return result;
+}
+
+function searchPhotoRecipes() {
+  const targetRgb = getPhotoTargetRgb();
+  const resultsElement = document.getElementById("reverseResults");
+  if (!targetRgb) {
+    resultsElement.innerHTML = "";
+    const message = document.createElement("div");
+    message.className = "result-warning";
+    message.textContent = "先に写真の髪色を3か所ほどタップしてください。";
+    resultsElement.appendChild(message);
+    return;
+  }
+
+  const targetHex = rgbToHex(targetRgb.r, targetRgb.g, targetRgb.b).toUpperCase();
+  const lv = normalizeBaseLevel(document.getElementById("photoBaseRange").value);
+  const colorants = Object.keys(singleColorResults);
+  const diluters = ["Clear", "Pastel", "11BK"];
+  const ratios = [[4,1], [3,1], [2,1], [1,1], [1,2], [1,3], [1,4]];
+  const candidates = [];
+
+  colorants.forEach(name => {
+    const recipe = [{ name, gram: 10 }];
+    const result = evaluateRecipeAtLevel(recipe, lv);
+    candidates.push(createPhotoCandidate(recipe, result, targetHex));
+  });
+
+  for (let i = 0; i < colorants.length; i++) {
+    for (let j = i + 1; j < colorants.length; j++) {
+      ratios.forEach(([a, b]) => {
+        const recipe = [
+          { name: colorants[i], gram: a * 10 },
+          { name: colorants[j], gram: b * 10 }
+        ];
+        const result = evaluateRecipeAtLevel(recipe, lv);
+        candidates.push(createPhotoCandidate(recipe, result, targetHex));
+      });
+    }
+  }
+
+  colorants.forEach(name => {
+    diluters.forEach(diluter => {
+      ratios.forEach(([a, b]) => {
+        const recipe = [{ name, gram: a * 10 }, { name: diluter, gram: b * 10 }];
+        const result = evaluateRecipeAtLevel(recipe, lv);
+        candidates.push(createPhotoCandidate(recipe, result, targetHex));
+      });
+    });
+  });
+
+  candidates.sort((a, b) => a.score - b.score || a.distance - b.distance);
+  photoSearchResults = candidates.slice(0, 8);
+  renderPhotoResults(targetHex, lv);
+}
+
+function renderPhotoResults(targetHex, lv) {
+  const container = document.getElementById("reverseResults");
+  container.innerHTML = "";
+  photoSearchResults.forEach((result, index) => {
+    const card = document.createElement("div");
+    card.className = "reverse-card";
+    const swatch = document.createElement("div");
+    swatch.className = "reverse-swatch";
+    swatch.style.backgroundColor = result.hex;
+    const text = document.createElement("div");
+    const recipe = document.createElement("div");
+    recipe.className = "reverse-recipe";
+    recipe.textContent = `${index + 1}. ${result.recipe.map(item => `${item.name} ${item.gram / 10}`).join(" : ")}`;
+    const detail = document.createElement("div");
+    detail.className = "reverse-detail";
+    detail.textContent = `予測 ${result.hex} / 目標 ${targetHex} / Lv.${lv}`;
+    text.appendChild(recipe);
+    text.appendChild(detail);
+    const button = document.createElement("button");
+    button.className = "use-recipe-btn";
+    button.textContent = "使う";
+    button.addEventListener("click", () => usePhotoRecipe(index, lv));
+    card.appendChild(swatch);
+    card.appendChild(text);
+    card.appendChild(button);
+    container.appendChild(card);
+  });
+}
+
+function usePhotoRecipe(index, lv) {
+  const result = photoSearchResults[index];
+  if (!result) return;
+  currentRecipe = result.recipe.map(item => ({ ...item }));
+  document.getElementById("baseRange").value = String(lv);
+  updateBaseToneDisplay("baseRange", "levelBadge", "baseToneSwatch");
+  renderRecipe();
+  calculateMix();
+  showScreen("mixerScreen");
+}
+
+function setupSelectorEvents() {
+  document.querySelectorAll("[data-hue]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("[data-hue]").forEach(item => item.classList.remove("active"));
+      btn.classList.add("active");
+      selectedTargetHue = btn.dataset.hue;
+      document.getElementById("targetHueLabel").textContent = selectorHueNames[selectedTargetHue];
+    });
+  });
+
+  document.querySelectorAll("[data-uneven]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("[data-uneven]").forEach(item => item.classList.remove("active"));
+      btn.classList.add("active");
+      selectedUnevenness = btn.dataset.uneven;
+      const labels = { low: "小", medium: "中", high: "大" };
+      document.getElementById("unevenLabel").textContent = labels[selectedUnevenness];
+    });
+  });
+
+  document.getElementById("targetLevelRange").addEventListener("input", e => {
+    document.getElementById("targetLevelBadge").textContent = `Lv.${e.target.value}`;
+  });
+
+  document.getElementById("selectorBaseRange").addEventListener("input", e => {
+    e.target.value = String(normalizeBaseLevel(e.target.value));
+    updateBaseToneDisplay("selectorBaseRange", "selectorBaseLevelBadge", "selectorBaseSwatch");
+  });
+
+  document.getElementById("generateRecipeBtn").addEventListener("click", generateSelectorRecipe);
+}
+
+function addRecipeAmount(recipe, name, gram) {
+  if (gram <= 0) return;
+  const existing = recipe.find(item => item.name === name);
+  if (existing) existing.gram += gram;
+  else recipe.push({ name, gram });
+}
+
+function generateSelectorRecipe() {
+  const baseLv = normalizeBaseLevel(document.getElementById("selectorBaseRange").value);
+  const targetLv = Number(document.getElementById("targetLevelRange").value);
+  const recipe = [];
+  const main = selectorMainRecipes[selectedTargetHue];
+  const coolHues = ["ash", "greige", "blue", "green", "violet"];
+  const warmHues = ["beige", "pink", "red", "orange"];
+
+  main.forEach(([name, parts]) => addRecipeAmount(recipe, name, parts * 10));
+  const mainTotal = recipe.reduce((sum, item) => sum + item.gram, 0);
+  const notes = [`目的色：${selectorHueNames[selectedTargetHue]}`];
+
+  // 高明度はティント総量を抑え、低明度はBK/BRで染料密度と安定性を加える。
+  if (targetLv >= 15) {
+    addRecipeAmount(recipe, "Clear", Math.round(mainTotal * 1.5));
+    notes.push("高明度：Clearでティント総量を調整");
+  } else if (targetLv >= 12) {
+    addRecipeAmount(recipe, "Clear", Math.round(mainTotal * 0.5));
+    notes.push("中高明度：Clearで沈み込みを抑制");
+  } else if (targetLv <= 11) {
+    const neutralLevel = targetLv <= 5 ? "5" : targetLv <= 8 ? "7" : "9";
+    const neutralName = warmHues.includes(selectedTargetHue)
+      ? `${neutralLevel}BR`
+      : `${neutralLevel}BK`;
+    const neutralRate = targetLv <= 5 ? 1 : targetLv <= 8 ? 0.5 : 0.2;
+    addRecipeAmount(recipe, neutralName, Math.max(5, Math.round(mainTotal * neutralRate)));
+    notes.push(`低〜中明度：${neutralName}で明度と染料密度を調整`);
+  }
+
+  // 現在のアンダーに対する補色。ピカラ実測が増えるまで控えめな割合に限定する。
+  if (coolHues.includes(selectedTargetHue) && baseLv >= 9 && baseLv <= 14) {
+    addRecipeAmount(recipe, "Blue", Math.max(3, Math.round(mainTotal * 0.1)));
+    notes.push("補色：中明度の赤橙味にBlueを少量");
+  } else if (baseLv >= 15 && ["ash", "greige", "beige"].includes(selectedTargetHue)) {
+    addRecipeAmount(recipe, "Violet", Math.max(2, Math.round(mainTotal * 0.08)));
+    notes.push("補色：高明度の黄味にVioletを少量");
+  }
+
+  // ムラが大きいほどブラウンを補正色として加え、色相差を馴染ませる。
+  if (selectedUnevenness !== "low") {
+    const correctionRate = selectedUnevenness === "medium" ? 0.2 : 0.4;
+    const correctionName = targetLv <= 7 ? "7BR" : "9BR";
+    addRecipeAmount(recipe, correctionName, Math.max(4, Math.round(mainTotal * correctionRate)));
+    notes.push(`補正色：${correctionName}でベースの明度差を馴染ませる`);
+  }
+
+  currentRecipe = recipe;
+  document.getElementById("baseRange").value = String(baseLv);
+  updateBaseToneDisplay("baseRange", "levelBadge", "baseToneSwatch");
+  renderRecipe();
+  calculateMix();
+
+  const active = currentRecipe.filter(item => item.gram > 0);
+  document.getElementById("selectorRecipe").textContent = active
+    .map(item => `${item.name} ${item.gram}g`)
+    .join(" ＋ ");
+  document.getElementById("selectorNote").textContent = notes.join("。") + "。";
+  document.getElementById("selectorSwatch").style.backgroundColor =
+    document.getElementById("outHex").textContent;
+
+  const warning = document.getElementById("selectorWarning");
+  if (targetLv > baseLv) {
+    warning.textContent = `現在Lv${baseLv}から希望Lv${targetLv}へのリフト量は未確定です。表示色は現在ベースへの染色予測で、実際のトーンアップはオキシ・アルカリ・履歴の確認が必要です。`;
+    warning.style.display = "block";
+  } else {
+    warning.textContent = "現段階の推奨レシピです。実測登録済みの配合は実測を優先し、未登録条件は単品マスターから推定します。";
+    warning.style.display = "block";
+  }
+  document.getElementById("selectorResult").classList.add("visible");
+}
+
+function addColorToRecipe(name) {
+  const existing = currentRecipe.find(item => item.name === name);
+  if (existing) existing.gram += 10; else currentRecipe.push({ name: name, gram: 10 });
+  renderRecipe(); calculateMix();
+}
+
+function updateGram(index, amount) {
+  currentRecipe[index].gram = Math.max(0, currentRecipe[index].gram + amount);
+  if (currentRecipe[index].gram === 0) currentRecipe.splice(index, 1);
+  renderRecipe(); calculateMix();
+}
+
+function removeRow(index) { currentRecipe.splice(index, 1); renderRecipe(); calculateMix(); }
+
+function renderRecipe() {
+  const list = document.getElementById("mixList"); list.innerHTML = "";
+  currentRecipe.forEach((item, index) => {
+    const div = document.createElement("div"); div.className = "mix-item"; div.style.borderLeft = `6px solid ${picaraColors[item.name] || '#ccc'}`;
+    const dot = document.createElement("div"); dot.className = "color-dot"; dot.style.backgroundColor = picaraColors[item.name] || '#ccc';
+    if (item.name === "Clear" || item.name === "11BK") dot.style.border = "1px solid #cbd5e1";
+    const txt = document.createElement("span"); txt.className = "color-name"; txt.textContent = item.name;
+    const vol = document.createElement("div"); vol.className = "volume-control";
+    const btnM = document.createElement("button"); btnM.className = "btn-circle"; btnM.textContent = "-"; btnM.addEventListener("click", () => updateGram(index, -5));
+    const input = document.createElement("input"); input.type = "number"; input.value = item.gram; input.addEventListener("input", (e) => { currentRecipe[index].gram = Math.max(0, Number(e.target.value) || 0); calculateMix(); });
+    const btnP = document.createElement("button"); btnP.className = "btn-circle"; btnP.textContent = "+"; btnP.addEventListener("click", () => updateGram(index, 5));
+    const btnD = document.createElement("button"); btnD.className = "btn-circle btn-del"; btnD.textContent = "✕"; btnD.addEventListener("click", () => removeRow(index));
+    vol.appendChild(btnM); vol.appendChild(input); vol.appendChild(btnP); div.appendChild(dot); div.appendChild(txt); div.appendChild(vol); div.appendChild(btnD); list.appendChild(div);
+  });
+}
+
+function gcdInt(a, b) {
+  a = Math.abs(Math.round(a));
+  b = Math.abs(Math.round(b));
+  while (b) {
+    const t = b;
+    b = a % b;
+    a = t;
+  }
+  return a || 1;
+}
+
+function recipeRatioString(items) {
+  if (items.length === 1) return "100%";
+  const grams = items.map(item => Math.max(0, Math.round(Number(item.gram) || 0)));
+  const gcd = grams.reduce((a, b) => gcdInt(a, b));
+  return grams.map(g => String(Math.round(g / gcd))).join(":");
+}
+
+function getSingleColorHex(name, lv) {
+  const series = singleColorResults[name];
+  if (series && series[lv - 1]) return series[lv - 1];
+  if (name === "11BK" || name === "Clear" || name === "Pastel") {
+    return baseLevelColors[lv];
+  }
+  return null;
+}
+
+function interpolateOklabHex(fromHex, toHex, ratio) {
+  const fromRgb = hexToRgb(fromHex);
+  const toRgb = hexToRgb(toHex);
+  const fromLab = rgbToOklab(fromRgb.r, fromRgb.g, fromRgb.b);
+  const toLab = rgbToOklab(toRgb.r, toRgb.g, toRgb.b);
+  const t = Math.max(0, Math.min(1, ratio));
+  const rgb = oklabToRgb(
+    fromLab.L + (toLab.L - fromLab.L) * t,
+    fromLab.a + (toLab.a - fromLab.a) * t,
+    fromLab.b + (toLab.b - fromLab.b) * t
+  );
+  return rgbToHex(rgb.r, rgb.g, rgb.b).toUpperCase();
+}
+
+function getCalibratedSingleColor(name, lv) {
+  const calibration = singleColorCalibrations[name];
+  if (!calibration) return null;
+
+  const baseHex = baseLevelColors[lv];
+  if (!baseHex) return null;
+  const baseRgb = hexToRgb(baseHex);
+  const baseL = rgbToOklab(baseRgb.r, baseRgb.g, baseRgb.b).L;
+
+  const darkBaseRgb = hexToRgb(calibration.darkBase);
+  const measuredBaseRgb = hexToRgb(calibration.measuredBase);
+  const whiteBaseRgb = hexToRgb(calibration.whiteBase);
+  const darkL = rgbToOklab(darkBaseRgb.r, darkBaseRgb.g, darkBaseRgb.b).L;
+  const measuredL = rgbToOklab(
+    measuredBaseRgb.r,
+    measuredBaseRgb.g,
+    measuredBaseRgb.b
+  ).L;
+  const whiteL = rgbToOklab(whiteBaseRgb.r, whiteBaseRgb.g, whiteBaseRgb.b).L;
+
+  if (baseL <= measuredL) {
+    return {
+      hex: interpolateOklabHex(
+        calibration.darkResult,
+        calibration.measuredResult,
+        (baseL - darkL) / (measuredL - darkL)
+      ),
+      source: calibration.source
+    };
+  }
+
+  return {
+    hex: interpolateOklabHex(
+      calibration.measuredResult,
+      calibration.whiteResult,
+      (baseL - measuredL) / (whiteL - measuredL)
+    ),
+    source: calibration.source
+  };
+}
+
+function getEffectiveSingleColorHex(name, lv) {
+  const calibrated = getCalibratedSingleColor(name, lv);
+  return calibrated ? calibrated.hex : getSingleColorHex(name, lv);
+}
+
+function getEffectiveSingleColorHexForItem(name, lv) {
+  if (name === "11BK") name = "Clear";
+  return getEffectiveSingleColorHex(name, lv) || baseLevelColors[lv];
+}
+
+function predictColorantMixForItemsAtLevel(items, lv) {
+  const activeItems = items.filter(item => item.gram > 0);
+  if (!activeItems.length) return baseLevelColors[lv];
+
+  let totalL = 0, totala = 0, totalb = 0, totalW = 0;
+  activeItems.forEach(item => {
+    const rgb = hexToRgb(getEffectiveSingleColorHexForItem(item.name, lv));
+    const lab = rgbToOklab(rgb.r, rgb.g, rgb.b);
+    totalL += lab.L * item.gram;
+    totala += lab.a * item.gram;
+    totalb += lab.b * item.gram;
+    totalW += item.gram;
+  });
+  const rgb = oklabToRgb(totalL / totalW, totala / totalW, totalb / totalW);
+  return rgbToHex(rgb.r, rgb.g, rgb.b).toUpperCase();
+}
+
+function predictColorantMixAtLevel(lv) {
+  return predictColorantMixForItemsAtLevel(currentRecipe.filter(item => item.gram > 0), lv);
+}
+
+function labDelta(fromHex, toHex) {
+  const fromRgb = hexToRgb(fromHex);
+  const toRgb = hexToRgb(toHex);
+  const fromLab = rgbToOklab(fromRgb.r, fromRgb.g, fromRgb.b);
+  const toLab = rgbToOklab(toRgb.r, toRgb.g, toRgb.b);
+  return {
+    L: toLab.L - fromLab.L,
+    a: toLab.a - fromLab.a,
+    b: toLab.b - fromLab.b
+  };
+}
+
+function applyLabDelta(hex, delta, strength = 0.65) {
+  const rgb = hexToRgb(hex);
+  const lab = rgbToOklab(rgb.r, rgb.g, rgb.b);
+
+  // 実測値をそのまま表示するのではなく、傾向だけを使う。
+  // 強すぎる補正は色飛びの原因になるため上限をかける。
+  const maxL = 0.08;
+  const maxC = 0.055;
+  const dL = Math.max(-maxL, Math.min(maxL, delta.L * strength));
+  const da = Math.max(-maxC, Math.min(maxC, delta.a * strength));
+  const db = Math.max(-maxC, Math.min(maxC, delta.b * strength));
+  const out = oklabToRgb(lab.L + dL, lab.a + da, lab.b + db);
+  return rgbToHex(out.r, out.g, out.b).toUpperCase();
+}
+
+function interpolateDelta(low, high, t) {
+  return {
+    L: low.L + (high.L - low.L) * t,
+    a: low.a + (high.a - low.a) * t,
+    b: low.b + (high.b - low.b) * t
+  };
+}
+
+function getLearnedMeasurementCorrection(sorted, names, lv) {
+  if (sorted.length !== 2) return null;
+
+  const targetRatio = Number(sorted[0].gram) / Number(sorted[1].gram);
+  if (!Number.isFinite(targetRatio) || targetRatio <= 0) return null;
+
+  const ratioCandidates = ["1:4", "1:3", "1:2", "1:1", "2:1", "3:1", "4:1"];
+
+  for (const baseKey of baseKeyCandidatesForLevel(lv)) {
+    const anchors = ratioCandidates.map(ratioStr => {
+      const found = getRealMixByParts(names, baseKey, ratioStr);
+      const ratioValue = ratioValueFromString(ratioStr);
+      if (!found || !ratioValue) return null;
+      const [g1, g2] = ratioStr.split(":").map(Number);
+      const predicted = predictColorantMixForItemsAtLevel([
+        { name: names[0], gram: g1 },
+        { name: names[1], gram: g2 }
+      ], lv);
+      return {
+        ratioStr,
+        ratioValue,
+        realHex: found.hex,
+        predictedHex: predicted,
+        delta: labDelta(predicted, found.hex)
+      };
+    }).filter(Boolean).sort((a, b) => a.ratioValue - b.ratioValue);
+
+    if (!anchors.length) continue;
+
+    let correction = null;
+    const exact = anchors.find(item => Math.abs(item.ratioValue - targetRatio) < 0.0001);
+    if (exact) {
+      correction = exact.delta;
+    } else {
+      let low = null;
+      let high = null;
+      for (const item of anchors) {
+        if (item.ratioValue < targetRatio) low = item;
+        if (item.ratioValue > targetRatio) {
+          high = item;
+          break;
+        }
+      }
+
+      if (low && high) {
+        const t = (targetRatio - low.ratioValue) / (high.ratioValue - low.ratioValue);
+        correction = interpolateDelta(low.delta, high.delta, t);
+      } else {
+        // 実測範囲外は一番近い実測の補正を使うが、離れるほど少し弱める。
+        const edge = targetRatio > anchors[anchors.length - 1].ratioValue
+          ? anchors[anchors.length - 1]
+          : anchors[0];
+        const distance = Math.abs(targetRatio - edge.ratioValue);
+        const decay = 1 / (1 + distance * 0.45);
+        correction = {
+          L: edge.delta.L * decay,
+          a: edge.delta.a * decay,
+          b: edge.delta.b * decay
+        };
+      }
+    }
+
+    if (correction) {
+      return {
+        delta: correction,
+        source: "単品推定＋実測学習補正"
+      };
+    }
+  }
+
+  return null;
+}
+
+function ratioValueFromString(ratioStr) {
+  const [a, b] = String(ratioStr).split(":").map(Number);
+  if (!a || !b) return null;
+  return a / b;
+}
+
+function baseKeyCandidatesForLevel(lv) {
+  const keys = [`Lv${lv}`];
+  const baseHex = (baseLevelColors[lv] || "").toUpperCase();
+  if (baseHex) keys.push(baseHex);
+  return keys;
+}
+
+function getRealMixByParts(names, baseKey, ratioStr) {
+  const key = `${names.join("|")}|${baseKey}|${ratioStr}`;
+  if (!realMixData[key]) return null;
+  return {
+    key,
+    hex: realMixData[key],
+    source: realMixDataSource[key] || "Excel実測データ"
+  };
+}
+
+function getMeasuredRatioInterpolation(sorted, names, lv) {
+  if (sorted.length !== 2) return null;
+
+  const targetRatio = Number(sorted[0].gram) / Number(sorted[1].gram);
+  if (!Number.isFinite(targetRatio) || targetRatio <= 0) return null;
+
+  // Excel上の毛束データは 1:4〜4:1 が基準。
+  // 中間は実測同士で補間し、基準外は一番近い実測から単品方向へゆるく外挿する。
+  // これにより 4:1→4.5:1 で急に単品マスター推定へ飛ぶ現象を防ぐ。
+  const ratioCandidates = ["1:4", "1:3", "1:2", "1:1", "2:1", "3:1", "4:1"];
+
+  for (const baseKey of baseKeyCandidatesForLevel(lv)) {
+    const measured = ratioCandidates
+      .map(ratioStr => {
+        const found = getRealMixByParts(names, baseKey, ratioStr);
+        if (!found) return null;
+        return { ...found, ratioStr, ratioValue: ratioValueFromString(ratioStr) };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.ratioValue - b.ratioValue);
+
+    if (!measured.length) continue;
+
+    const exact = measured.find(item => Math.abs(item.ratioValue - targetRatio) < 0.0001);
+    if (exact) {
+      return { hex: exact.hex, source: exact.source };
+    }
+
+    let low = null;
+    let high = null;
+    for (const item of measured) {
+      if (item.ratioValue < targetRatio) low = item;
+      if (item.ratioValue > targetRatio) {
+        high = item;
+        break;
+      }
+    }
+
+    // 実測範囲内：前後の実測値をOKLabで補間する。
+    if (low && high) {
+      const t = (targetRatio - low.ratioValue) / (high.ratioValue - low.ratioValue);
+      return {
+        hex: interpolateOklabHex(low.hex, high.hex, t),
+        source: `実測間補間（${low.ratioStr}〜${high.ratioStr}）`
+      };
+    }
+
+    // 実測範囲外：一番近い実測から、増えている側の単品色へゆるく外挿する。
+    // 例：Green(4):9BR(1) の次は、いきなり単品推定に飛ばさず、
+    // 4:1の実測から Green単品 へ少しだけ寄せる。
+    const edge = targetRatio > measured[measured.length - 1].ratioValue
+      ? measured[measured.length - 1]
+      : measured[0];
+
+    const dominantName = targetRatio > measured[measured.length - 1].ratioValue
+      ? names[0]
+      : names[1];
+
+    const edgeDominantFraction = dominantName === names[0]
+      ? edge.ratioValue / (edge.ratioValue + 1)
+      : 1 / (edge.ratioValue + 1);
+
+    const targetDominantFraction = dominantName === names[0]
+      ? targetRatio / (targetRatio + 1)
+      : 1 / (targetRatio + 1);
+
+    const denom = 1 - edgeDominantFraction;
+    if (denom <= 0) continue;
+
+    const t = Math.max(0, Math.min(1, (targetDominantFraction - edgeDominantFraction) / denom));
+    const singleHex = getEffectiveSingleColorHex(dominantName, lv) || baseLevelColors[lv];
+
+    if (singleHex) {
+      return {
+        hex: interpolateOklabHex(edge.hex, singleHex, t),
+        source: `実測端外挿（${edge.ratioStr}→${dominantName}単品）`
+      };
+    }
+  }
+
+  return null;
+}
+
+// 💥 Excel実測データベース検索エンジン
+function getMatchedRealValue(lv) {
+  const active = currentRecipe.filter(item => item.gram > 0);
+  if (active.length === 0) return null;
+
+  // 単品100%は「色マスター (2)」を無加工で返す。
+  if (active.length === 1) {
+    const calibrated = getCalibratedSingleColor(active[0].name, lv);
+    if (calibrated) return calibrated;
+
+    const hex = getSingleColorHex(active[0].name, lv);
+    if (hex) {
+      const isSpecial = ["11BK", "Clear", "Pastel"].includes(active[0].name);
+      return {
+        hex,
+        source: isSpecial ? "特殊剤単品（ベース色を維持）" : "色マスター (2)"
+      };
+    }
+  }
+
+  // Excelデータ生成時と同じく、色名をアルファベット順に固定
+  const sorted = [...active].sort((a, b) => a.name.localeCompare(b.name));
+  const names = sorted.map(item => item.name);
+  const ratioStr = recipeRatioString(sorted);
+
+  for (const baseKey of baseKeyCandidatesForLevel(lv)) {
+    const exact = getRealMixByParts(names, baseKey, ratioStr);
+    if (exact) {
+      return {
+        hex: exact.hex,
+        source: exact.source
+      };
+    }
+  }
+
+  // 2色配合で前後の実測比率がある場合、単品推定に飛ばさず実測同士で補間する。
+  const ratioInterpolated = getMeasuredRatioInterpolation(sorted, names, lv);
+  if (ratioInterpolated) return ratioInterpolated;
+
+  return null;
+}
+
+// 任意のレベルにおいて実測値から滑らかにレベル補間をかける関数
+function getInterpolatedColorAtLevel(lv) {
+  // 指定Lvに直接データがあるかチェック
+  const exact = getMatchedRealValue(lv);
+  if (exact) return { rgb: hexToRgb(exact.hex), source: exact.source };
+
+  // ない場合は近隣の基準Lv(1, 10, 14, 20)からOKLab空間上で滑らかに繋ぐ
+  let lowLv = 1, highLv = 10;
+  if (lv > 14) { lowLv = 14; highLv = 20; }
+  else if (lv > 10) { lowLv = 10; highLv = 14; }
+
+  const lowData = getMatchedRealValue(lowLv) || { hex: predictColorantMixAtLevel(lowLv) };
+  const highHex = (getMatchedRealValue(highLv) || {
+    hex: predictColorantMixAtLevel(highLv)
+  }).hex;
+
+  const lowRgb = hexToRgb(lowData.hex);
+  const highRgb = hexToRgb(highHex);
+
+  const lowLab = rgbToOklab(lowRgb.r, lowRgb.g, lowRgb.b);
+  const highLab = rgbToOklab(highRgb.r, highRgb.g, highRgb.b);
+
+  const ratio = (lv - lowLv) / (highLv - lowLv);
+  const mixedLab = {
+    L: lowLab.L + (highLab.L - lowLab.L) * ratio,
+    a: lowLab.a + (highLab.a - lowLab.a) * ratio,
+    b: lowLab.b + (highLab.b - lowLab.b) * ratio
+  };
+
+  return {
+    rgb: oklabToRgb(mixedLab.L, mixedLab.a, mixedLab.b),
+    source: "実測値・単品マスターからLv補間"
+  };
+}
+
+function rgbLuminance(rgb) {
+  return 0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b;
+}
+
+// Lv1-5は撮影反射を含む実測HEXをそのまま採用せず、
+// 黒髪の地明度とBK濃度を上限にして色相を保ったまま暗さを補正する。
+function applyDarkHairLuminanceLimit(rgb, lv) {
+  if (lv > 5) return rgb;
+  // Lv2はLv1実測とLv10実測の補間値が自然につながっているため、
+  // 上限補正をかけるとLv2だけ不自然に暗くなる。
+  if (lv === 2) return rgb;
+
+  const active = currentRecipe.filter(item => item.gram > 0);
+  const totalGram = active.reduce((sum, item) => sum + item.gram, 0);
+  if (!totalGram) return rgb;
+
+  const baseLuminance = rgbLuminance(hexToRgb(baseLevelColors[lv]));
+  const vividCapOffset = { 1: 10, 2: 11, 3: 12, 4: 13, 5: 14 }[lv];
+  let cap = baseLuminance + vividCapOffset;
+
+  const bkOffsets = { "3BK": 2, "5BK": 4, "7BK": 6, "9BK": 8, "11BK": 10 };
+  const bkItems = active.filter(item => Object.hasOwn(bkOffsets, item.name));
+  const bkGram = bkItems.reduce((sum, item) => sum + item.gram, 0);
+  if (bkGram > 0) {
+    const weightedBkOffset = bkItems.reduce(
+      (sum, item) => sum + bkOffsets[item.name] * item.gram,
+      0
+    ) / bkGram;
+    const bkFraction = bkGram / totalGram;
+    const bkCap = baseLuminance + weightedBkOffset;
+    cap = cap * (1 - bkFraction) + bkCap * bkFraction;
+  }
+
+  // Clear/Pastelは黒髪そのものを白くしないため、明度を持ち上げず地色へ戻す。
+  const diluterGram = active
+    .filter(item => item.name === "Clear" || item.name === "Pastel")
+    .reduce((sum, item) => sum + item.gram, 0);
+  if (diluterGram > 0) {
+    const fraction = diluterGram / totalGram;
+    cap = cap * (1 - fraction) + baseLuminance * fraction;
+  }
+
+  const currentLuminance = rgbLuminance(rgb);
+  if (currentLuminance <= cap || currentLuminance <= 0) return rgb;
+
+  const scale = cap / currentLuminance;
+  return {
+    r: rgb.r * scale,
+    g: rgb.g * scale,
+    b: rgb.b * scale
+  };
+}
+
+function calculateHairResult(lv, totalGram) {
+  const baseRgb = hexToRgb(baseLevelColors[lv]);
+  const active = currentRecipe.filter(item => item.gram > 0);
+
+  // ここからは「実測値を直接表示」ではなく、単品推定を本体にする。
+  // 実測データは色味のズレ傾向を学習するためだけに使う。
+  let predictedHex = predictColorantMixAtLevel(lv);
+  let sourceStr = "単品推定";
+
+  const sorted = [...active].sort((a, b) => a.name.localeCompare(b.name));
+  const names = sorted.map(item => item.name);
+  const learned = getLearnedMeasurementCorrection(sorted, names, lv);
+  if (learned) {
+    predictedHex = applyLabDelta(predictedHex, learned.delta, 0.65);
+    sourceStr = learned.source;
+  }
+
+  let rgb = hexToRgb(predictedHex);
+  let finalR = rgb.r;
+  let finalG = rgb.g;
+  let finalB = rgb.b;
+
+  const clearGram = active
+    .filter(item => item.name === "11BK" || item.name === "Clear")
+    .reduce((sum, item) => sum + item.gram, 0);
+  const pastelGram = active
+    .filter(item => item.name === "Pastel")
+    .reduce((sum, item) => sum + item.gram, 0);
+
+  // Clearと11BKは同一処理。白を足さず、染料濃度を下げてベース側へ戻す。
+  if (clearGram > 0 && totalGram > 0) {
+    const diluteRatio = clearGram / totalGram;
+    const currentLab = rgbToOklab(finalR, finalG, finalB);
+    const baseLab = rgbToOklab(baseRgb.r, baseRgb.g, baseRgb.b);
+    const transparentRgb = oklabToRgb(
+      currentLab.L * (1 - diluteRatio) + baseLab.L * diluteRatio,
+      currentLab.a * (1 - diluteRatio) + baseLab.a * diluteRatio,
+      currentLab.b * (1 - diluteRatio) + baseLab.b * diluteRatio
+    );
+    finalR = transparentRgb.r;
+    finalG = transparentRgb.g;
+    finalB = transparentRgb.b;
+    sourceStr += "＋透明希釈";
+  }
+
+  // PastelはClearとは別扱い。ベースへ戻しつつ、弱いミルキー感だけを加える。
+  if (pastelGram > 0 && totalGram > 0) {
+    const pastelRatio = pastelGram / totalGram;
+    const currentLab = rgbToOklab(finalR, finalG, finalB);
+    const baseLab = rgbToOklab(baseRgb.r, baseRgb.g, baseRgb.b);
+    const pastelRgb = hexToRgb(picaraColors.Pastel || "#F4EDE6");
+    const pastelLab = rgbToOklab(pastelRgb.r, pastelRgb.g, pastelRgb.b);
+    const targetLab = {
+      L: baseLab.L * 0.92 + pastelLab.L * 0.08,
+      a: baseLab.a * 0.92 + pastelLab.a * 0.08,
+      b: baseLab.b * 0.92 + pastelLab.b * 0.08
+    };
+    const milkyRgb = oklabToRgb(
+      currentLab.L * (1 - pastelRatio) + targetLab.L * pastelRatio,
+      currentLab.a * (1 - pastelRatio) + targetLab.a * pastelRatio,
+      currentLab.b * (1 - pastelRatio) + targetLab.b * pastelRatio
+    );
+    finalR = milkyRgb.r;
+    finalG = milkyRgb.g;
+    finalB = milkyRgb.b;
+    sourceStr += "＋Pastel";
+  }
+
+  const corrected = applyDarkHairLuminanceLimit(
+    { r: finalR, g: finalG, b: finalB },
+    lv
+  );
+  finalR = corrected.r;
+  finalG = corrected.g;
+  finalB = corrected.b;
+
+  return {
+    hex: rgbToHex(finalR, finalG, finalB).toUpperCase(),
+    source: sourceStr
+  };
+}
+
+function calculateMix() {
+  let totalGram = 0;
+  currentRecipe.forEach(item => totalGram += item.gram);
+  document.getElementById("outTotal").textContent = totalGram + " g";
+
+  if (totalGram === 0) {
+    document.getElementById("swatchAgent").style.backgroundColor = "#ffffff";
+    document.getElementById("swatchFinal").style.backgroundColor = "#ffffff";
+    document.getElementById("outHex").textContent = "—";
+    document.getElementById("outRatio").textContent = "—";
+    document.getElementById("outSource").textContent = "—";
+    return;
+  }
+
+  const lv = normalizeBaseLevel(document.getElementById("baseRange").value);
+  const reference = calculateHairResult(20, totalGram);
+  const finalResult = lv === 20
+    ? reference
+    : calculateHairResult(lv, totalGram);
+
+  document.getElementById("swatchAgent").style.backgroundColor = reference.hex;
+  document.getElementById("swatchFinal").style.backgroundColor = finalResult.hex;
+  const finalHex = finalResult.hex;
+  document.getElementById("swatchFinal").style.backgroundColor = finalHex;
+  document.getElementById("outHex").textContent = finalHex;
+  document.getElementById("outSource").textContent = finalResult.source;
+
+  updateRatioText();
+}
+
+function updateRatioText() {
+  const active = currentRecipe.filter(item => item.gram > 0);
+  if (!active.length) {
+    document.getElementById("outRatio").textContent = "—";
+    return;
+  }
+  const minG = Math.min(...active.map(i => i.gram));
+  document.getElementById("outRatio").textContent = active.map(item => `${item.name}(${Math.round((item.gram / minG) * 10) / 10})`).join(" : ");
+}
+</script>
+</body>
+</html>
