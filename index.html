@@ -402,15 +402,15 @@ window.addEventListener("DOMContentLoaded", async () => {
 
 async function loadPicaraData() {
   try {
-    const rColors = await fetch("colors.json");
+    const rColors = await fetch("data/colors.json");
     const colorsData = await rColors.json();
     picaraColors = colorsData.picaraColors;
     baseLevelColors = colorsData.baseLevelColors;
 
-    const rSingle = await fetch("singleColorResults.json");
+    const rSingle = await fetch("data/singleColorResults.json");
     singleColorResults = await rSingle.json();
 
-    const rMix = await fetch("realMixData.json");
+    const rMix = await fetch("data/realMixData.json");
     realMixDataSource = await rMix.json();
   } catch (e) {
     console.error("データの読み込みに失敗しました:", e);
