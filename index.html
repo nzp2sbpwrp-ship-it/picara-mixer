@@ -907,11 +907,10 @@ function backToPiCoLoRHome() {
   const photo = document.getElementById("screenPhoto");
 
   if (home) home.style.display = "";
-  if (mixer) mixer.classList.remove("active");
-  if (photo) photo.classList.remove("active");
-
-  if (mixer) mixer.style.display = "none";
-  if (photo) photo.style.display = "none";
+  document.querySelectorAll(".screen-content").forEach(screen => {
+    screen.classList.remove("active");
+    screen.style.display = "";
+  });
 
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -1038,14 +1037,24 @@ async function loadPicaraData() {
 // --- 📱 画面遷移 ---
 
 function openMixer(){
-  document.getElementById('homeScreen').style.display='none';
-  document.getElementById('screenMixer').classList.add('active');
+  document.getElementById("homeScreen").style.display = "none";
+  document.querySelectorAll(".screen-content").forEach(screen => {
+    screen.classList.remove("active");
+    screen.style.display = "";
+  });
+  document.getElementById("screenMixer").classList.add("active");
+  window.scrollTo({ top: 0, behavior: "auto" });
 }
 function openPhoto(){
-  document.getElementById('homeScreen').style.display='none';
-  document.getElementById('screenPhoto').classList.add('active');
+  document.getElementById("homeScreen").style.display = "none";
+  document.querySelectorAll(".screen-content").forEach(screen => {
+    screen.classList.remove("active");
+    screen.style.display = "";
+  });
+  document.getElementById("screenPhoto").classList.add("active");
   const photoRange = document.getElementById("photoBaseRange");
   if (photoRange) updatePhotoBaseLabel(photoRange.value);
+  window.scrollTo({ top: 0, behavior: "auto" });
 }
 
 function switchScreen(screen) {
@@ -1434,6 +1443,7 @@ function handleImageUpload(event) {
       photoPoints = [];
       latestPhotoTargetHex = null;
       clearMarkers();
+      syncPhotoMarkerLayer();
       photoZoomReset();
       updatePhotoSummary();
 
@@ -1451,6 +1461,7 @@ function applyPhotoZoom() {
   if (!canvas) return;
   canvas.style.width = (photoZoomValue * 100) + "%";
   canvas.style.height = "auto";
+  syncPhotoMarkerLayer();
 }
 
 function photoZoomIn() {
@@ -1473,38 +1484,78 @@ function photoZoomReset() {
   }
 }
 
+function syncPhotoMarkerLayer() {
+  const canvas = document.getElementById("photoCanvas");
+  const container = document.getElementById("canvasContainer");
+  if (!canvas || !container) return null;
+
+  if (getComputedStyle(container).position === "static") {
+    container.style.position = "relative";
+  }
+
+  let layer = document.getElementById("photoMarkerLayer");
+  if (!layer) {
+    layer = document.createElement("div");
+    layer.id = "photoMarkerLayer";
+    layer.style.position = "absolute";
+    layer.style.left = "0";
+    layer.style.top = "0";
+    layer.style.pointerEvents = "none";
+    layer.style.zIndex = "2";
+    container.appendChild(layer);
+  }
+
+  const rect = canvas.getBoundingClientRect();
+  const containerRect = container.getBoundingClientRect();
+  layer.style.left = `${canvas.offsetLeft}px`;
+  layer.style.top = `${canvas.offsetTop}px`;
+  layer.style.width = `${rect.width}px`;
+  layer.style.height = `${rect.height}px`;
+
+  return { layer, rect, containerRect };
+}
+
+function getCanvasPointFromEvent(event) {
+  const canvas = document.getElementById("photoCanvas");
+  if (!canvas) return null;
+
+  const rect = canvas.getBoundingClientRect();
+  const cssX = event.clientX - rect.left;
+  const cssY = event.clientY - rect.top;
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const imageX = cssX * scaleX;
+  const imageY = cssY * scaleY;
+
+  if (imageX < 0 || imageY < 0 || imageX > canvas.width || imageY > canvas.height) return null;
+  return { imageX, imageY, cssX, cssY };
+}
+
 function onCanvasClick(event) {
   if (!uploadedImage) return;
 
   const canvas = document.getElementById("photoCanvas");
-  const rect = canvas.getBoundingClientRect();
-
-  const scaleX = canvas.width / rect.width;
-  const scaleY = canvas.height / rect.height;
-  const x = (event.clientX - rect.left) * scaleX;
-  const y = (event.clientY - rect.top) * scaleY;
-
-  if (x < 0 || y < 0 || x > canvas.width || y > canvas.height) return;
+  const point = getCanvasPointFromEvent(event);
+  if (!point) return;
 
   const ctx = canvas.getContext("2d");
-  const imgData = ctx.getImageData(Math.floor(x), Math.floor(y), 1, 1).data;
+  const imgData = ctx.getImageData(Math.floor(point.imageX), Math.floor(point.imageY), 1, 1).data;
 
-  photoPoints.push({ x, y, r: imgData[0], g: imgData[1], b: imgData[2] });
-  renderMarker(event.clientX - rect.left + document.getElementById("canvasContainer").scrollLeft,
-               event.clientY - rect.top + document.getElementById("canvasContainer").scrollTop,
-               imgData);
+  photoPoints.push({ x: point.imageX, y: point.imageY, r: imgData[0], g: imgData[1], b: imgData[2] });
+  renderMarker(point.cssX, point.cssY, imgData);
 
   updatePhotoSummary();
 }
 
 function renderMarker(clickX, clickY, imgData) {
-  const container = document.getElementById("canvasContainer");
+  const synced = syncPhotoMarkerLayer();
+  const layer = synced ? synced.layer : document.getElementById("canvasContainer");
   const marker = document.createElement("div");
   marker.className = "photo-marker";
   marker.style.left = `${clickX}px`;
   marker.style.top = `${clickY}px`;
   marker.style.backgroundColor = `rgb(${imgData[0]}, ${imgData[1]}, ${imgData[2]})`;
-  container.appendChild(marker);
+  layer.appendChild(marker);
 }
 
 function clearMarkers() {
@@ -1788,8 +1839,38 @@ function simulateRecipeWithCurrentTheory(recipeItems, lv) {
   };
 }
 
-function candidateRecipesForPhoto() {
-  const names = Object.keys(picaraColors).filter(name => !isRemovedSpecialColor(name));
+function roundGram(value) {
+  return Math.round((Number(value) || 0) * 10) / 10;
+}
+
+function scaleRecipeToTotal(items, totalGram = 30) {
+  const total = items.reduce((sum, item) => sum + (Number(item.gram) || 0), 0);
+  if (total <= 0) return [];
+  return items.map(item => ({ name: item.name, gram: roundGram((Number(item.gram) || 0) / total * totalGram) }));
+}
+
+function addModifierToRecipe(items, modifierName, modifierRatio, totalGram = 30) {
+  const p = Math.max(0, Math.min(0.95, Number(modifierRatio) || 0));
+  if (p <= 0) return scaleRecipeToTotal(items, totalGram);
+
+  const normalTotal = totalGram * (1 - p);
+  const modifierGram = totalGram * p;
+  return [
+    ...scaleRecipeToTotal(items, normalTotal),
+    { name: modifierName, gram: roundGram(modifierGram) }
+  ].filter(item => item.gram > 0);
+}
+
+function recipeSignature(items) {
+  return items
+    .filter(item => (Number(item.gram) || 0) > 0)
+    .map(item => `${item.name}:${roundGram(item.gram)}`)
+    .sort()
+    .join("|");
+}
+
+function candidateBaseRecipesForPhoto() {
+  const names = Object.keys(picaraColors).filter(name => !isDilutionModifier(name));
   const candidates = [];
 
   names.forEach(name => {
@@ -1812,7 +1893,76 @@ function candidateRecipesForPhoto() {
     }
   }
 
+  const ratioTriples = [
+    [1,1,1], [2,1,1], [1,2,1], [1,1,2],
+    [3,2,1], [3,1,2], [2,3,1], [2,1,3], [1,3,2], [1,2,3]
+  ];
+
+  for (let i = 0; i < names.length; i++) {
+    for (let j = i + 1; j < names.length; j++) {
+      for (let k = j + 1; k < names.length; k++) {
+        ratioTriples.forEach(([a,b,c]) => {
+          const total = a + b + c;
+          candidates.push([
+            { name: names[i], gram: roundGram(30 * a / total) },
+            { name: names[j], gram: roundGram(30 * b / total) },
+            { name: names[k], gram: roundGram(30 * c / total) }
+          ]);
+        });
+      }
+    }
+  }
+
   return candidates;
+}
+
+function expandPhotoRecipeCandidates(baseItems) {
+  const expanded = [scaleRecipeToTotal(baseItems, 30)];
+  const modifiers = [
+    { name: "Clear", ratios: [0.2, 0.5, 0.8] },
+    { name: "11BK", ratios: [0.2, 0.5, 0.8] },
+    { name: "Pastel", ratios: [0.2, 0.5, 0.8, 0.9] }
+  ];
+
+  modifiers.forEach(mod => {
+    if (!picaraColors[mod.name]) return;
+    mod.ratios.forEach(ratio => expanded.push(addModifierToRecipe(baseItems, mod.name, ratio, 30)));
+  });
+
+  return expanded;
+}
+
+function rankPhotoCandidates(candidates, lv, limit, options = {}) {
+  const seen = new Set();
+  const ranked = [];
+
+  candidates.forEach(items => {
+    const normalized = scaleRecipeToTotal(items, 30).filter(item => item.gram > 0);
+    const sig = recipeSignature(normalized);
+    if (!sig || seen.has(sig)) return;
+    seen.add(sig);
+
+    const result = simulateRecipeWithCurrentTheory(normalized, lv);
+    ranked.push({
+      items: normalized,
+      hex: result.hex,
+      source: result.source,
+      diff: colorDistance(latestPhotoTargetHex, result.hex)
+    });
+  });
+
+  const sorted = ranked.sort((a,b) => a.diff - b.diff);
+  if (!options.uniqueHex) return sorted.slice(0, limit);
+
+  const hexSeen = new Set();
+  const unique = [];
+  sorted.forEach(item => {
+    const hexKey = item.hex || "";
+    if (hexSeen.has(hexKey)) return;
+    hexSeen.add(hexKey);
+    unique.push(item);
+  });
+  return unique.slice(0, limit);
 }
 
 function recipeLabel(items) {
@@ -1831,17 +1981,14 @@ function findPhotoRecipes() {
   }
 
   const lv = normalizeBaseLevel(document.getElementById("photoBaseRange").value);
-  const candidates = candidateRecipesForPhoto();
+  const baseCandidates = candidateBaseRecipesForPhoto();
+  const nearestBase = rankPhotoCandidates(baseCandidates, lv, 120);
+  const expandedCandidates = [];
+  nearestBase.forEach(candidate => {
+    expandedCandidates.push(...expandPhotoRecipeCandidates(candidate.items));
+  });
 
-  const ranked = candidates.map(items => {
-    const result = simulateRecipeWithCurrentTheory(items, lv);
-    return {
-      items,
-      hex: result.hex,
-      source: result.source,
-      diff: colorDistance(latestPhotoTargetHex, result.hex)
-    };
-  }).sort((a,b) => a.diff - b.diff).slice(0, 5);
+  const ranked = rankPhotoCandidates(expandedCandidates, lv, 8, { uniqueHex: true });
 
   const resultEl = document.getElementById("photoReverseResults");
   resultEl.innerHTML = ranked.map((r, idx) => `
@@ -1858,7 +2005,6 @@ function findPhotoRecipes() {
 
 function applyPhotoRecipe(items, lv) {
   currentRecipe = items
-    .filter(item => !isRemovedSpecialColor(item.name))
     .map(item => ({ ...item }));
 
   document.getElementById("baseRange").value = lv;
