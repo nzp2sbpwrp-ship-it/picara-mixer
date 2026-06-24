@@ -1079,7 +1079,6 @@ function renderPalette() {
   grid.innerHTML = "";
 
   Object.entries(picaraColors)
-    .filter(([name]) => !isRemovedSpecialColor(name))
     .forEach(([name, hex]) => {
       const btn = document.createElement("button");
       btn.className = "palette-btn";
@@ -1100,10 +1099,6 @@ function renderPalette() {
 }
 
 function addColorToRecipe(name) {
-  if (isRemovedSpecialColor(name)) return;
-
-  stripRemovedSpecialColors();
-
   const existing = currentRecipe.find(item => item.name === name);
   if (!existing) {
     currentRecipe.push({ name, gram: 10 });
@@ -1113,8 +1108,6 @@ function addColorToRecipe(name) {
 }
 
 function renderRecipe() {
-  stripRemovedSpecialColors();
-
   const container = document.getElementById("recipeContainer");
   container.innerHTML = "";
 
@@ -1274,8 +1267,6 @@ function applyOnColorGradientToSwatch(swatchEl, baseLv, totalGram, recipe = curr
 
 
 function updateFinalOutput() {
-  stripRemovedSpecialColors();
-
   const totalGram = currentRecipe.reduce((sum, item) => sum + (Number(item.gram) || 0), 0);
   document.getElementById("outTotal").textContent = totalGram + " g";
 
@@ -1345,22 +1336,31 @@ function getDyeActiveRecipe(recipe = currentRecipe) {
 function calculateHairResult(lv, totalGram, recipe = currentRecipe) {
   const level = normalizeBaseLevel(lv);
   const dyeActive = getDyeActiveRecipe(recipe);
+  const specialRatios = getSpecialRatios(recipe);
 
   // 実測値は直採用しない。色マスターを軸にして、Lv・比率が滑らかに動く推定だけで表示する。
   if (dyeActive.length === 0) {
-    return { hex: baseLevelColors[String(level)] || "#FFFFFF", source: "ベース色 + 特殊剤のみ" };
+    const baseHex = baseLevelColors[String(level)] || "#FFFFFF";
+    return {
+      hex: applySpecialDilution(baseHex, specialRatios),
+      source: "ベース色 + 特殊剤のみ" + getSpecialDilutionSourceSuffix(specialRatios)
+    };
   }
 
   if (dyeActive.length === 1) {
     const singleName = dyeActive[0].name;
     if (singleColorResults[singleName] && singleColorResults[singleName][level - 1]) {
-      return { hex: singleColorResults[singleName][level - 1], source: "色マスター単品" };
+      return {
+        hex: applySpecialDilution(singleColorResults[singleName][level - 1], specialRatios),
+        source: "色マスター単品" + getSpecialDilutionSourceSuffix(specialRatios)
+      };
     }
   }
 
+  const blendedHex = blendColorsByWeight(level, dyeActive);
   return {
-    hex: blendColorsByWeight(level, dyeActive),
-    source: "色マスター推定・重み付け演算"
+    hex: applySpecialDilution(blendedHex, specialRatios),
+    source: "色マスター推定・重み付け演算" + getSpecialDilutionSourceSuffix(specialRatios)
   };
 }
 
@@ -1722,8 +1722,8 @@ function applyPastelDilution(hex, pastelRatio) {
   const p = Math.max(0, Math.min(0.95, Number(pastelRatio) || 0));
   if (p <= 0) return hex;
 
-  // Pastelは白ではなく、シルバーラベンダー系に寄せる。
-  const pastelTone = "#C8C8D2";
+  // Pastelは白ではなく、色マスター側のPastelトーンへ寄せる。
+  const pastelTone = picaraColors.Pastel || PASTEL_TONE_HEX_FINAL;
   const pastelMix = 0.42 * p; // p=0.8で約34% Pastelトーンへ
   const mixed = mixHexForPastel(hex, pastelTone, pastelMix);
 
