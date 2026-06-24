@@ -284,6 +284,33 @@
     opacity: 0.35;
     border-color: #000000;
   }
+  .photo-magnifier {
+    position: fixed;
+    z-index: 9999;
+    display: none;
+    width: 132px;
+    padding: 6px;
+    border-radius: 12px;
+    background: rgba(15, 23, 42, 0.92);
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.28);
+    pointer-events: none;
+  }
+  .photo-magnifier canvas {
+    width: 120px;
+    height: 120px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.75);
+    image-rendering: pixelated;
+    background: #000;
+  }
+  .photo-magnifier-label {
+    margin-top: 4px;
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 800;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
 
   .btn-action {
     width: 100%;
@@ -1013,6 +1040,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   renderPalette();
   updateBaseToneUI(14);
   updatePhotoBaseLabel(14);
+  setupPhotoMagnifier();
   updateFinalOutput();
 });
 
@@ -1516,12 +1544,16 @@ function syncPhotoMarkerLayer() {
 }
 
 function getCanvasPointFromEvent(event) {
+  return getCanvasPointFromClient(event.clientX, event.clientY);
+}
+
+function getCanvasPointFromClient(clientX, clientY) {
   const canvas = document.getElementById("photoCanvas");
   if (!canvas) return null;
 
   const rect = canvas.getBoundingClientRect();
-  const cssX = event.clientX - rect.left;
-  const cssY = event.clientY - rect.top;
+  const cssX = clientX - rect.left;
+  const cssY = clientY - rect.top;
   const scaleX = canvas.width / rect.width;
   const scaleY = canvas.height / rect.height;
   const imageX = cssX * scaleX;
@@ -1529,6 +1561,104 @@ function getCanvasPointFromEvent(event) {
 
   if (imageX < 0 || imageY < 0 || imageX > canvas.width || imageY > canvas.height) return null;
   return { imageX, imageY, cssX, cssY };
+}
+
+function ensurePhotoMagnifier() {
+  let magnifier = document.getElementById("photoMagnifier");
+  if (magnifier) return magnifier;
+
+  magnifier = document.createElement("div");
+  magnifier.id = "photoMagnifier";
+  magnifier.className = "photo-magnifier";
+
+  const preview = document.createElement("canvas");
+  preview.width = 120;
+  preview.height = 120;
+  preview.id = "photoMagnifierCanvas";
+
+  const label = document.createElement("div");
+  label.id = "photoMagnifierLabel";
+  label.className = "photo-magnifier-label";
+  label.textContent = "#------";
+
+  magnifier.appendChild(preview);
+  magnifier.appendChild(label);
+  document.body.appendChild(magnifier);
+  return magnifier;
+}
+
+function hidePhotoMagnifier() {
+  const magnifier = document.getElementById("photoMagnifier");
+  if (magnifier) magnifier.style.display = "none";
+}
+
+function drawPhotoMagnifier(clientX, clientY) {
+  if (!uploadedImage) return;
+
+  const canvas = document.getElementById("photoCanvas");
+  const point = getCanvasPointFromClient(clientX, clientY);
+  if (!canvas || !point) {
+    hidePhotoMagnifier();
+    return;
+  }
+
+  const magnifier = ensurePhotoMagnifier();
+  const preview = document.getElementById("photoMagnifierCanvas");
+  const label = document.getElementById("photoMagnifierLabel");
+  const pctx = preview.getContext("2d");
+  const ctx = canvas.getContext("2d");
+
+  const px = Math.floor(point.imageX);
+  const py = Math.floor(point.imageY);
+  const sample = ctx.getImageData(px, py, 1, 1).data;
+  const hex = rgbToHex(sample[0], sample[1], sample[2]);
+
+  const sourceSize = 24;
+  const sx = Math.max(0, Math.min(canvas.width - sourceSize, px - sourceSize / 2));
+  const sy = Math.max(0, Math.min(canvas.height - sourceSize, py - sourceSize / 2));
+
+  pctx.imageSmoothingEnabled = false;
+  pctx.clearRect(0, 0, preview.width, preview.height);
+  pctx.drawImage(canvas, sx, sy, sourceSize, sourceSize, 0, 0, preview.width, preview.height);
+
+  pctx.strokeStyle = "#ffffff";
+  pctx.lineWidth = 2;
+  pctx.beginPath();
+  pctx.moveTo(preview.width / 2, 0);
+  pctx.lineTo(preview.width / 2, preview.height);
+  pctx.moveTo(0, preview.height / 2);
+  pctx.lineTo(preview.width, preview.height / 2);
+  pctx.stroke();
+
+  pctx.strokeStyle = "#111827";
+  pctx.lineWidth = 1;
+  pctx.strokeRect(preview.width / 2 - 4, preview.height / 2 - 4, 8, 8);
+
+  label.textContent = `${hex}  x:${px} y:${py}`;
+  magnifier.style.display = "block";
+
+  const margin = 14;
+  const boxWidth = 144;
+  const boxHeight = 158;
+  let left = clientX + margin;
+  let top = clientY + margin;
+  if (left + boxWidth > window.innerWidth) left = clientX - boxWidth - margin;
+  if (top + boxHeight > window.innerHeight) top = clientY - boxHeight - margin;
+  magnifier.style.left = `${Math.max(8, left)}px`;
+  magnifier.style.top = `${Math.max(8, top)}px`;
+}
+
+function setupPhotoMagnifier() {
+  const canvas = document.getElementById("photoCanvas");
+  if (!canvas || canvas.dataset.magnifierReady === "1") return;
+  canvas.dataset.magnifierReady = "1";
+
+  canvas.addEventListener("pointerenter", (event) => drawPhotoMagnifier(event.clientX, event.clientY));
+  canvas.addEventListener("pointermove", (event) => drawPhotoMagnifier(event.clientX, event.clientY));
+  canvas.addEventListener("pointerdown", (event) => drawPhotoMagnifier(event.clientX, event.clientY));
+  canvas.addEventListener("pointerup", hidePhotoMagnifier);
+  canvas.addEventListener("pointercancel", hidePhotoMagnifier);
+  canvas.addEventListener("pointerleave", hidePhotoMagnifier);
 }
 
 function onCanvasClick(event) {
