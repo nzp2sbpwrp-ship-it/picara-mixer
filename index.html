@@ -1858,7 +1858,9 @@ function getClearRatioFromRecipe() {
 // Clear / 11BK / Pastel は通常色として混ぜない。
 // 通常色だけで色マスター軸の仕上がりを作り、最後に1回だけ特殊剤補正をかける。
 // 実測値は直採用せず、係数調整の勉強材料として扱う。
-const PASTEL_TONE_HEX_FINAL = "#C8C8D2";
+// Pastel実測は白ではなく、淡い灰み/ラベンダー方向。
+// colors.jsonのPastelは暫定白寄りなので、補正式ではこちらを使う。
+const PASTEL_TONE_HEX_FINAL = "#B8B4BC";
 
 function getSpecialRatios(recipe = currentRecipe) {
   if (!Array.isArray(recipe)) return { clear: 0, pastel: 0, total: 0 };
@@ -1899,25 +1901,68 @@ function mixHexForPastel(hexA, hexB, t) {
   );
 }
 
+function interpolatePastelCurve(p, points) {
+  const ratio = Math.max(0, Math.min(0.95, Number(p) || 0));
+  if (!Array.isArray(points) || points.length === 0) return ratio;
+  if (ratio <= points[0][0]) return points[0][1];
+
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1];
+    const next = points[i];
+    if (ratio <= next[0]) {
+      const span = Math.max(0.0001, next[0] - prev[0]);
+      const t = (ratio - prev[0]) / span;
+      return prev[1] + (next[1] - prev[1]) * t;
+    }
+  }
+
+  return points[points.length - 1][1];
+}
+
 function applyPastelDilution(hex, pastelRatio) {
   const p = Math.max(0, Math.min(0.95, Number(pastelRatio) || 0));
   if (p <= 0) return hex;
 
-  // Pastelは白ではなく、色マスター側のPastelトーンへ寄せる。
-  const pastelTone = picaraColors.Pastel || PASTEL_TONE_HEX_FINAL;
-  const pastelMix = 0.42 * p; // p=0.8で約34% Pastelトーンへ
-  const mixed = mixHexForPastel(hex, pastelTone, pastelMix);
+  // 染めた当日のBlue/Red:Pastel 1:4は、退色後より彩度が残る。
+  // Pastelは白/灰色へ直線的に寄せず、元色の色相を残したまま明度上げ・軽い白濁をかける。
+  const hsl = hexToHslForClear(hex);
+  if (!hsl) return hex;
 
-  const hsl = hexToHslForClear(mixed);
-  if (!hsl) return mixed;
+  const satDrop = interpolatePastelCurve(p, [
+    [0.00, 0.00],
+    [0.20, 0.03],
+    [0.50, 0.10],
+    [0.70, 0.18],
+    [0.80, 0.24],
+    [0.90, 0.32],
+    [0.95, 0.38]
+  ]);
+  const lightBoost = interpolatePastelCurve(p, [
+    [0.00, 0.00],
+    [0.20, 0.03],
+    [0.50, 0.12],
+    [0.70, 0.27],
+    [0.80, 0.39],
+    [0.90, 0.50],
+    [0.95, 0.56]
+  ]);
 
-  const satFactor = 1 - (0.28 * p);
-  const lightBoost = 0.22 * p;
-
-  const nextS = Math.max(0, Math.min(1, hsl.s * satFactor));
+  const nextS = Math.max(0, Math.min(1, hsl.s * (1 - satDrop)));
   const nextL = Math.max(0, Math.min(0.94, hsl.l + (1 - hsl.l) * lightBoost));
 
-  return hslToHexForClear(hsl.h, nextS, nextL);
+  const hueKept = hslToHexForClear(hsl.h, nextS, nextL);
+
+  // 高Pastel域だけ、ごく弱く灰みを足す。退色後のくすみは基本表示には混ぜすぎない。
+  const veilMix = interpolatePastelCurve(p, [
+    [0.00, 0.00],
+    [0.50, 0.00],
+    [0.70, 0.03],
+    [0.80, 0.06],
+    [0.90, 0.10],
+    [0.95, 0.13]
+  ]);
+
+  return mixHexForPastel(hueKept, PASTEL_TONE_HEX_FINAL, veilMix);
 }
 
 function applySpecialDilution(hex, ratios = getSpecialRatios(currentRecipe)) {
