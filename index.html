@@ -1845,8 +1845,9 @@ function getPastelVisibilityByLevel(level) {
   return Math.max(0, Math.min(1, (lv - 6) / 14));
 }
 
-function applyClearDilution(hex, clearRatio, baseLevel = null) {
+function applyClearDilution(hex, clearRatio, baseLevel = null, rawClearRatio = null) {
   const c = Math.max(0, Math.min(0.95, Number(clearRatio) || 0));
+  const rawC = Math.max(0, Math.min(0.95, Number(rawClearRatio ?? clearRatio) || 0));
   if (c <= 0) return hex;
 
   const lv = getCurrentSpecialBaseLevel(baseLevel);
@@ -1856,12 +1857,13 @@ function applyClearDilution(hex, clearRatio, baseLevel = null) {
 
   // Clear / 11BK は明るくしない。色を薄めてベース側へ戻すだけ。
   // 黒髪ほどベース支配を強くし、高明度ではやや見えやすくする。
-  const basePull = Math.max(0, Math.min(0.92, c * (lv <= 5 ? 0.92 : 0.78)));
+  const darkClampPull = lv <= 5 ? Math.max(c * 0.92, rawC * 0.55) : c * 0.78;
+  const basePull = Math.max(0, Math.min(0.92, darkClampPull));
   const pulled = mixHexForPastel(hex, baseHex, basePull);
   const pulledHsl = hexToHslForClear(pulled);
   if (!pulledHsl) return pulled;
 
-  const satFactor = 1 - (0.10 * c);
+  const satFactor = 1 - (0.08 * c);
   const nextS = Math.max(0, Math.min(1, pulledHsl.s * satFactor));
   const nextL = Math.max(0, Math.min(1, pulledHsl.l)); // 明度アップ禁止
 
@@ -1885,25 +1887,71 @@ function getClearRatioFromRecipe() {
 // 実測値は直採用せず、係数調整の勉強材料として扱う。
 // Pastel実測は白ではなく、淡い灰み/ラベンダー方向。
 // colors.jsonのPastelは暫定白寄りなので、補正式ではこちらを使う。
-const PASTEL_TONE_HEX_FINAL = "#B8B4BC";
+// Pastel / Clear / 11BK は「色」ではなく媒体。Vivid色素はg数以上に強く効く。
+// そのため特殊剤比率をそのまま使わず、通常色の染料支配力で圧縮した effective 値を使う。
+const SPECIAL_EMPTY_RATIOS = { clear: 0, pastel: 0, total: 0, rawClear: 0, rawPastel: 0, effectiveClear: 0, effectivePastel: 0, dyePower: 0 };
+
+function getDyeStrengthForSpecial(name) {
+  const n = String(name || "").trim();
+  const table = {
+    Blue: 3.2,
+    Cyan: 3.0,
+    Lapis: 2.9,
+    Red: 2.8,
+    FPink: 2.7,
+    Violet: 2.6,
+    Green: 2.5,
+    Orange: 2.2,
+    Gold: 2.0,
+    Greige: 1.8,
+    Warm: 1.7,
+    Cool: 1.7,
+    "3BK": 1.6, "5BK": 1.6, "7BK": 1.6, "9BK": 1.6,
+    "5BR": 1.6, "7BR": 1.6, "9BR": 1.6,
+    "6ALTBR": 1.6, "8ALTBR": 1.6, "10ALTBR": 1.6
+  };
+  return table[n] || 2.0;
+}
 
 function getSpecialRatios(recipe = currentRecipe) {
-  if (!Array.isArray(recipe)) return { clear: 0, pastel: 0, total: 0 };
+  if (!Array.isArray(recipe)) return { ...SPECIAL_EMPTY_RATIOS };
 
   const total = recipe.reduce((sum, item) => sum + (Number(item.gram) || 0), 0);
-  if (total <= 0) return { clear: 0, pastel: 0, total: 0 };
+  if (total <= 0) return { ...SPECIAL_EMPTY_RATIOS };
 
-  const clearGram = recipe
-    .filter(item => item.name === "Clear" || item.name === "11BK")
-    .reduce((sum, item) => sum + (Number(item.gram) || 0), 0);
+  let clearGram = 0;
+  let pastelGram = 0;
+  let dyePower = 0;
 
-  const pastelGram = recipe
-    .filter(item => item.name === "Pastel")
-    .reduce((sum, item) => sum + (Number(item.gram) || 0), 0);
+  recipe.forEach(item => {
+    const name = String(item && item.name || "");
+    const gram = Math.max(0, Number(item && item.gram) || 0);
+    if (gram <= 0) return;
+
+    if (name === "Clear" || name === "11BK") {
+      clearGram += gram;
+    } else if (name === "Pastel") {
+      pastelGram += gram;
+    } else {
+      dyePower += gram * getDyeStrengthForSpecial(name);
+    }
+  });
+
+  const rawClear = Math.max(0, Math.min(0.95, clearGram / total));
+  const rawPastel = Math.max(0, Math.min(0.95, pastelGram / total));
+
+  // 通常色が無い時は特殊剤で発色・明度上昇させない。補正式側でベース同士のmixになり実質変化なし。
+  const effectiveClear = clearGram > 0 ? clearGram / Math.max(0.0001, clearGram + dyePower) : 0;
+  const effectivePastel = pastelGram > 0 ? pastelGram / Math.max(0.0001, pastelGram + dyePower) : 0;
 
   return {
-    clear: Math.max(0, Math.min(0.95, clearGram / total)),
-    pastel: Math.max(0, Math.min(0.95, pastelGram / total)),
+    clear: rawClear,
+    pastel: rawPastel,
+    rawClear,
+    rawPastel,
+    effectiveClear: Math.max(0, Math.min(0.95, effectiveClear)),
+    effectivePastel: Math.max(0, Math.min(0.95, effectivePastel)),
+    dyePower,
     total
   };
 }
@@ -1961,92 +2009,96 @@ function pastelCurveValue(p, points) {
   return points[points.length - 1][1];
 }
 
-function applyPastelDilution(hex, pastelRatio, baseLevel = null) {
+function applyPastelDilution(hex, pastelRatio, baseLevel = null, rawPastelRatio = null) {
+  // pastelRatio は raw g比率ではなく、通常色の染料支配力で圧縮した effectivePastel を渡す。
+  // 例：Blue 1 : Pastel 4 は raw 80% でも、Blueの色素支配を加味して effective は約56%に圧縮。
   const p = Math.max(0, Math.min(0.95, Number(pastelRatio) || 0));
-  if (p <= 0) return hex;
+  const rawP = Math.max(0, Math.min(0.95, Number(rawPastelRatio ?? pastelRatio) || 0));
+  if (p <= 0 && rawP <= 0) return hex;
 
   const lv = getCurrentSpecialBaseLevel(baseLevel);
   const baseHex = baseLevelColors[String(lv)] || hex;
   const visibility = getPastelVisibilityByLevel(lv);
 
-  // Pastelは白を足す処理ではなく、実測のBlue/Red:Pastelアンカーに寄せた希釈処理。
-  // 黒髪〜低Lvでは白化禁止。高Lvでは色相を残し、ベースへ戻しすぎない。
-  const lowLevelBasePull = p * 0.96;
+  // PastelはPastel色へ寄せない。色素濃度を下げて、ベースの見え方を少し増やすだけ。
+  // 低Lvは rawP も使って白化を防ぐ。高Lvは effective p を主体にしてVivid色相を残す。
+  const lowLevelBasePull = Math.max(p * 0.96, rawP * 0.55);
   const highLevelBasePull = pastelCurveValue(p, [
     [0.00, 0.00],
-    [0.20, 0.05],
-    [0.33, 0.09],
-    [0.50, 0.14],
-    [0.70, 0.27],
-    [0.80, 0.34],
-    [0.90, 0.43],
-    [0.95, 0.48]
+    [0.15, 0.025],
+    [0.25, 0.045],
+    [0.33, 0.070],
+    [0.45, 0.105],
+    [0.55, 0.145],
+    [0.70, 0.220],
+    [0.85, 0.320],
+    [0.95, 0.400]
   ]);
   const midLevelBasePull = pastelCurveValue(p, [
     [0.00, 0.00],
-    [0.20, 0.10],
-    [0.33, 0.18],
-    [0.50, 0.28],
-    [0.70, 0.43],
-    [0.80, 0.53],
-    [0.90, 0.64],
-    [0.95, 0.70]
+    [0.15, 0.055],
+    [0.25, 0.090],
+    [0.33, 0.130],
+    [0.45, 0.200],
+    [0.55, 0.270],
+    [0.70, 0.390],
+    [0.85, 0.520],
+    [0.95, 0.620]
   ]);
 
   let basePull;
   if (lv <= 5) {
     basePull = lowLevelBasePull;
   } else {
-    // visibility 0=低Lv寄り、1=高Lv寄り。中間は暗部クランプを残しつつ滑らかに移行。
     basePull = midLevelBasePull * (1 - visibility) + highLevelBasePull * visibility;
   }
-  basePull = Math.max(0, Math.min(0.95, basePull));
+  basePull = Math.max(0, Math.min(0.92, basePull));
 
   const diluted = mixHexForPastel(hex, baseHex, basePull);
   const hsl = hexToHslForClear(diluted);
   if (!hsl) return diluted;
 
-  // 実測ではPastel 50%でもBlue/Redの色相はかなり残るので、彩度落ちは控えめ。
+  // 彩度もraw比率ではなくeffectiveで落とす。Pastel 3 : Vivid 1 でも色相主導権はVivid側に残す。
   const satDropHigh = pastelCurveValue(p, [
     [0.00, 0.00],
-    [0.20, 0.05],
-    [0.33, 0.08],
-    [0.50, 0.14],
-    [0.70, 0.23],
-    [0.80, 0.30],
-    [0.90, 0.40],
-    [0.95, 0.46]
+    [0.15, 0.015],
+    [0.25, 0.030],
+    [0.33, 0.050],
+    [0.45, 0.080],
+    [0.55, 0.115],
+    [0.70, 0.180],
+    [0.85, 0.270],
+    [0.95, 0.350]
   ]);
   const satDropLow = pastelCurveValue(p, [
     [0.00, 0.00],
-    [0.20, 0.08],
-    [0.33, 0.14],
-    [0.50, 0.22],
-    [0.70, 0.34],
-    [0.80, 0.43],
-    [0.90, 0.55],
-    [0.95, 0.62]
+    [0.15, 0.040],
+    [0.25, 0.070],
+    [0.33, 0.100],
+    [0.45, 0.155],
+    [0.55, 0.210],
+    [0.70, 0.310],
+    [0.85, 0.430],
+    [0.95, 0.540]
   ]);
   const satDrop = satDropLow * (1 - visibility) + satDropHigh * visibility;
   const nextS = Math.max(0, Math.min(1, hsl.s * (1 - satDrop)));
-  const nextL = Math.max(0, Math.min(1, hsl.l)); // Pastelによる明度アップは禁止
-  const hueKept = hslToHexForClear(hsl.h, nextS, nextL);
+  const nextL = Math.max(0, Math.min(1, hsl.l)); // Pastelで明度を上げない
 
-  // 白化ではなく、Lvが高い時だけ弱いベール感。黒髪では0。
-  const veilMix = p * visibility * 0.055;
-  return mixHexForPastel(hueKept, PASTEL_TONE_HEX_FINAL, veilMix);
+  // ここでPastelトーンHEXへmixしない。これがPastel寄り・白化の再発原因になる。
+  return hslToHexForClear(hsl.h, nextS, nextL);
 }
 
 function applySpecialDilution(hex, ratios = getSpecialRatios(currentRecipe), baseLevel = null) {
   let out = hex;
   const lv = getCurrentSpecialBaseLevel(baseLevel);
 
-  if (ratios.clear > 0) {
-    out = applyClearDilution(out, ratios.clear, lv);
+  if ((Number(ratios.clear) || 0) > 0) {
+    out = applyClearDilution(out, ratios.effectiveClear ?? ratios.clear, lv, ratios.rawClear ?? ratios.clear);
   }
 
-  if (ratios.pastel > 0) {
-    out = applyPastelDilution(out, ratios.pastel, lv);
+  if ((Number(ratios.pastel) || 0) > 0) {
+    out = applyPastelDilution(out, ratios.effectivePastel ?? ratios.pastel, lv, ratios.rawPastel ?? ratios.pastel);
   }
 
   return out;
