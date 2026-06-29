@@ -1379,7 +1379,7 @@ function calculateHairResult(lv, totalGram, recipe = currentRecipe) {
   if (dyeActive.length === 0) {
     const baseHex = baseLevelColors[String(level)] || "#FFFFFF";
     return {
-      hex: applySpecialDilution(baseHex, specialRatios),
+      hex: applySpecialDilution(baseHex, specialRatios, level),
       source: "ベース色 + 特殊剤のみ" + getSpecialDilutionSourceSuffix(specialRatios)
     };
   }
@@ -1388,7 +1388,7 @@ function calculateHairResult(lv, totalGram, recipe = currentRecipe) {
     const singleName = dyeActive[0].name;
     if (singleColorResults[singleName] && singleColorResults[singleName][level - 1]) {
       return {
-        hex: applySpecialDilution(singleColorResults[singleName][level - 1], specialRatios),
+        hex: applySpecialDilution(singleColorResults[singleName][level - 1], specialRatios, level),
         source: "色マスター単品" + getSpecialDilutionSourceSuffix(specialRatios)
       };
     }
@@ -1396,7 +1396,7 @@ function calculateHairResult(lv, totalGram, recipe = currentRecipe) {
 
   const blendedHex = blendColorsByWeight(level, dyeActive);
   return {
-    hex: applySpecialDilution(blendedHex, specialRatios),
+    hex: applySpecialDilution(blendedHex, specialRatios, level),
     source: "色マスター推定・重み付け演算" + getSpecialDilutionSourceSuffix(specialRatios)
   };
 }
@@ -1826,21 +1826,46 @@ function hslToHexForClear(h, s, l) {
   return "#" + toHex(r) + toHex(g) + toHex(b);
 }
 
-function applyClearDilution(hex, clearRatio) {
-  const hsl = hexToHslForClear(hex);
-  if (!hsl) return hex;
+function getCurrentSpecialBaseLevel(fallbackLevel = null) {
+  const explicitLevel = Number(fallbackLevel);
+  if (Number.isFinite(explicitLevel) && explicitLevel > 0) return normalizeBaseLevel(explicitLevel);
 
+  const baseRange = document.getElementById("baseRange");
+  if (baseRange && baseRange.value) return normalizeBaseLevel(baseRange.value);
+
+  const photoBaseRange = document.getElementById("photoBaseRange");
+  if (photoBaseRange && photoBaseRange.value) return normalizeBaseLevel(photoBaseRange.value);
+
+  return 14;
+}
+
+function getPastelVisibilityByLevel(level) {
+  const lv = getCurrentSpecialBaseLevel(level);
+  if (lv <= 5) return 0;
+  return Math.max(0, Math.min(1, (lv - 6) / 14));
+}
+
+function applyClearDilution(hex, clearRatio, baseLevel = null) {
   const c = Math.max(0, Math.min(0.95, Number(clearRatio) || 0));
   if (c <= 0) return hex;
 
-  // 1:4 = Clear/11BK 80%時点で、色相維持・彩度約90%・明度少し上げる。
-  const satFactor = 1 - (0.125 * c);
-  const lightBoost = 0.15 * c;
+  const lv = getCurrentSpecialBaseLevel(baseLevel);
+  const baseHex = baseLevelColors[String(lv)] || hex;
+  const hsl = hexToHslForClear(hex);
+  if (!hsl) return mixHexForPastel(hex, baseHex, c * 0.82);
 
-  const nextS = Math.max(0, Math.min(1, hsl.s * satFactor));
-  const nextL = Math.max(0, Math.min(0.92, hsl.l + (1 - hsl.l) * lightBoost));
+  // Clear / 11BK は明るくしない。色を薄めてベース側へ戻すだけ。
+  // 黒髪ほどベース支配を強くし、高明度ではやや見えやすくする。
+  const basePull = Math.max(0, Math.min(0.92, c * (lv <= 5 ? 0.92 : 0.78)));
+  const pulled = mixHexForPastel(hex, baseHex, basePull);
+  const pulledHsl = hexToHslForClear(pulled);
+  if (!pulledHsl) return pulled;
 
-  return hslToHexForClear(hsl.h, nextS, nextL);
+  const satFactor = 1 - (0.10 * c);
+  const nextS = Math.max(0, Math.min(1, pulledHsl.s * satFactor));
+  const nextL = Math.max(0, Math.min(1, pulledHsl.l)); // 明度アップ禁止
+
+  return hslToHexForClear(pulledHsl.h, nextS, nextL);
 }
 
 function getClearRatioFromRecipe() {
@@ -1919,61 +1944,40 @@ function interpolatePastelCurve(p, points) {
   return points[points.length - 1][1];
 }
 
-function applyPastelDilution(hex, pastelRatio) {
+function applyPastelDilution(hex, pastelRatio, baseLevel = null) {
   const p = Math.max(0, Math.min(0.95, Number(pastelRatio) || 0));
   if (p <= 0) return hex;
 
-  // 染めた当日のBlue/Red:Pastel 1:4は、退色後より彩度が残る。
-  // Pastelは白/灰色へ直線的に寄せず、元色の色相を残したまま明度上げ・軽い白濁をかける。
-  const hsl = hexToHslForClear(hex);
-  if (!hsl) return hex;
+  const lv = getCurrentSpecialBaseLevel(baseLevel);
+  const baseHex = baseLevelColors[String(lv)] || hex;
+  const visibility = getPastelVisibilityByLevel(lv);
 
-  const satDrop = interpolatePastelCurve(p, [
-    [0.00, 0.00],
-    [0.20, 0.03],
-    [0.50, 0.10],
-    [0.70, 0.18],
-    [0.80, 0.24],
-    [0.90, 0.32],
-    [0.95, 0.38]
-  ]);
-  const lightBoost = interpolatePastelCurve(p, [
-    [0.00, 0.00],
-    [0.20, 0.03],
-    [0.50, 0.12],
-    [0.70, 0.27],
-    [0.80, 0.39],
-    [0.90, 0.50],
-    [0.95, 0.56]
-  ]);
+  // Pastel は黒髪を明るくしない。
+  // まず色素を薄めてベースへ戻し、その後に高明度だけわずかにミルキー/灰みを見せる。
+  const basePull = Math.max(0, Math.min(0.95, p * (lv <= 5 ? 0.96 : (0.86 - visibility * 0.16))));
+  const diluted = mixHexForPastel(hex, baseHex, basePull);
+  const hsl = hexToHslForClear(diluted);
+  if (!hsl) return diluted;
 
+  const satDrop = p * (0.12 + 0.16 * visibility);
   const nextS = Math.max(0, Math.min(1, hsl.s * (1 - satDrop)));
-  const nextL = Math.max(0, Math.min(0.94, hsl.l + (1 - hsl.l) * lightBoost));
-
+  const nextL = Math.max(0, Math.min(1, hsl.l)); // 明度アップ禁止
   const hueKept = hslToHexForClear(hsl.h, nextS, nextL);
 
-  // 高Pastel域だけ、ごく弱く灰みを足す。退色後のくすみは基本表示には混ぜすぎない。
-  const veilMix = interpolatePastelCurve(p, [
-    [0.00, 0.00],
-    [0.50, 0.00],
-    [0.70, 0.03],
-    [0.80, 0.06],
-    [0.90, 0.10],
-    [0.95, 0.13]
-  ]);
-
+  const veilMix = p * visibility * 0.10;
   return mixHexForPastel(hueKept, PASTEL_TONE_HEX_FINAL, veilMix);
 }
 
-function applySpecialDilution(hex, ratios = getSpecialRatios(currentRecipe)) {
+function applySpecialDilution(hex, ratios = getSpecialRatios(currentRecipe), baseLevel = null) {
   let out = hex;
+  const lv = getCurrentSpecialBaseLevel(baseLevel);
 
   if (ratios.clear > 0) {
-    out = applyClearDilution(out, ratios.clear);
+    out = applyClearDilution(out, ratios.clear, lv);
   }
 
   if (ratios.pastel > 0) {
-    out = applyPastelDilution(out, ratios.pastel);
+    out = applyPastelDilution(out, ratios.pastel, lv);
   }
 
   return out;
@@ -1982,7 +1986,7 @@ function applySpecialDilution(hex, ratios = getSpecialRatios(currentRecipe)) {
 function getSpecialDilutionSourceSuffix(ratios = getSpecialRatios(currentRecipe)) {
   const parts = [];
   if ((Number(ratios.clear) || 0) > 0) parts.push("Clear/11BK濃度補正");
-  if ((Number(ratios.pastel) || 0) > 0) parts.push("Pastelミルキー補正");
+  if ((Number(ratios.pastel) || 0) > 0) parts.push("Pastel希釈補正");
   return parts.length ? " + " + parts.join(" + ") : "";
 }
 
@@ -2009,7 +2013,7 @@ function simulateRecipeWithCurrentTheory(recipeItems, lv) {
   const result = calculateHairResult(lv, total, normal);
   return {
     ...result,
-    hex: applySpecialDilution(result.hex, ratios),
+    hex: applySpecialDilution(result.hex, ratios, lv),
     source: result.source + getSpecialDilutionSourceSuffix(ratios)
   };
 }
@@ -2278,7 +2282,7 @@ function getSpecialRatiosSnapshot() {
 }
 
 function applySpecialDilutionWithRatios(hex, ratios) {
-  return applySpecialDilution(hex, ratios || { clear: 0, pastel: 0, total: 0 });
+  return applySpecialDilution(hex, ratios || { clear: 0, pastel: 0, total: 0 }, null);
 }
 
 function getSpecialDilutionSourceSuffixFromRatios(ratios) {
