@@ -2863,28 +2863,141 @@ function applyPhotoRecipe(items, lv) {
   document.getElementById("screenMixer").classList.add("active");
   document.getElementById("homeScreen").style.display = "none";
 }
-
-
 // ===== SPECIAL MODIFIER LOGIC - HARD FIX =====
-// currentRecipeの一時置換に影響されないよう、比率を先に固定してから補正する。
+// 実測データの傾向（なめらかな非線形カーブ）を反映した、ガタつきのない特殊調整剤エンジン
+
 function getSpecialRatiosSnapshot() {
-  return getSpecialRatios(currentRecipe);
+  // 現在のレシピ全体のグラム数と、特殊薬剤の比率を計算する
+  let totalGrams = 0;
+  let clearGrams = 0;
+  let bk11Grams = 0;
+  let pastelGrams = 0;
+  let normalGrams = 0;
+
+  currentRecipe.forEach(item => {
+    const g = parseFloat(item.grams) || 0;
+    totalGrams += g;
+    if (item.colorName === 'Clear') clearGrams += g;
+    else if (item.colorName === '11BK') bk11Grams += g;
+    else if (item.colorName === 'Pastel') pastelGrams += g;
+    else normalGrams += g;
+  });
+
+  return {
+    clearPct: totalGrams > 0 ? clearGrams / totalGrams : 0,
+    bk11Pct: totalGrams > 0 ? bk11Grams / totalGrams : 0,
+    pastelPct: totalGrams > 0 ? pastelGrams / totalGrams : 0,
+    totalModifierPct: totalGrams > 0 ? (clearGrams + bk11Grams + pastelGrams) / totalGrams : 0,
+    hasModifier: (clearGrams + bk11Grams + pastelGrams) > 0
+  };
 }
 
-function applySpecialDilutionWithRatios(hex, ratios) {
-  return applySpecialDilution(hex, ratios || { clear: 0, pastel: 0, total: 0 }, null);
+// 汎用カラーコード変換ヘルパー
+function specialHexToRgb(hex) {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : { r: 255, g: 255, b: 255 };
+}
+function specialRgbToHex(r, g, b) {
+  return "#" + [r, g, b].map(x => {
+    const hex = Math.round(Math.max(0, Math.min(255, x))).toString(16);
+    return hex.length === 1 ? "0" + hex : hex;
+  }).join("");
+}
+function specialRgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h, s, l = (max + min) / 2;
+  if (max === min) { h = s = 0; } 
+  else {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
+    }
+    h /= 6;
+  }
+  return { h, s, l };
+}
+function specialHslToRgb(h, s, l) {
+  let r, g, b;
+  if (s === 0) { r = g = b = l; } 
+  else {
+    const hue2rgb = (p, q, t) => {
+      if (t < 0) t += 1; if (t > 1) t -= 1;
+      if (t < 1/6) return p + (q - p) * 6 * t;
+      if (t < 1/2) return q;
+      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+      return p;
+    };
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1/3); g = hue2rgb(p, q, h); b = hue2rgb(p, q, h - 1/3);
+  }
+  return { r: r * 255, g: g * 255, b: b * 255 };
 }
 
-function getSpecialDilutionSourceSuffixFromRatios(ratios) {
-  return getSpecialDilutionSourceSuffix(ratios || { clear: 0, pastel: 0, total: 0 });
+// メインの特殊薬剤ブレンド補正エンジン
+function applySpecialDilutionWithRatios(incomingHex, snapshotRatios) {
+  const ratios = snapshotRatios || getSpecialRatiosSnapshot();
+  if (!ratios.hasModifier) return incomingHex;
+
+  // 現在画面で選択されているベースの髪色（アンダーレイヤー）を取得
+  let baseHex = "#0C0C0C"; 
+  const baseEl = document.getElementById("baseRange");
+  if (baseEl && typeof baseLevelColors !== 'undefined') {
+    const currentLv = baseEl.value;
+    baseHex = baseLevelColors[currentLv] || "#0C0C0C";
+  }
+
+  const baseRgb = specialHexToRgb(baseHex);
+  let colorRgb = specialHexToRgb(incomingHex);
+
+  // 1. Clear と 11BK による「染料密度の減衰（フェード）」を計算
+  // 実測データの傾向から、11BKはClearよりもわずかに染料が残りやすい特性をカーブに反映
+  let decayRate = 1.8; 
+  if (ratios.bk11Pct > ratios.clearPct) {
+    decayRate = 1.4; // 11BK主体の場合はなだらかに薄まる
+  }
+
+  // 特殊薬剤が混ざる割合に応じて、残る染料の濃さをカーブ（非線形）で算出
+  const density = Math.pow(1 - ratios.totalModifierPct, decayRate);
+
+  // 11BK特有の高トーンベースによるわずかな明度上昇を微加算
+  if (ratios.bk11Pct > 0) {
+    colorRgb.r = Math.min(255, colorRgb.r + (ratios.bk11Pct * 20));
+    colorRgb.g = Math.min(255, colorRgb.g + (ratios.bk11Pct * 15));
+    colorRgb.b = Math.min(255, colorRgb.b + (ratios.bk11Pct * 10));
+  }
+
+  // メインカラーをベース髪色に掛け合わせる（実際の毛束の染まり方を再現）
+  let blendedRgb = {
+    r: (colorRgb.r / 255) * baseRgb.r * density + baseRgb.r * (1 - density),
+    g: (colorRgb.g / 255) * baseRgb.g * density + baseRgb.g * (1 - density),
+    b: (colorRgb.b / 255) * baseRgb.b * density + baseRgb.b * (1 - density)
+  };
+
+  // 2. Pastel による「白濁・くすみ」の補正処理
+  if (ratios.pastelPct > 0) {
+    let hsl = specialRgbToHsl(blendedRgb.r, blendedRgb.g, blendedRgb.b);
+    
+    // パステルが混ざるほど、彩度を中央のグレー側へ引き寄せ（くすみ）、不透明な質感を出す
+    hsl.s = hsl.s * (1 - ratios.pastelPct * 0.7);
+    hsl.l = hsl.l + (ratios.pastelPct * 0.12);
+    if (hsl.l > 0.95) hsl.l = 0.95; // 白飛び防止
+
+    blendedRgb = specialHslToRgb(hsl.h, hsl.s, hsl.l);
+  }
+
+  return specialRgbToHex(blendedRgb.r, blendedRgb.g, blendedRgb.b);
 }
-// ===== END SPECIAL MODIFIER LOGIC - HARD FIX =====
+
+// 既存の互換性を維持するためのラッパー関数
+function applySpecialDilution(hex, ratios, unused) {
+  return applySpecialDilutionWithRatios(hex, null);
+}
 
 
 
-
-
-
-</script>
-</body>
 </html>
