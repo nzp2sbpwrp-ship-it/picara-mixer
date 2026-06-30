@@ -2010,83 +2010,89 @@ function pastelCurveValue(p, points) {
 }
 
 function applyPastelDilution(hex, pastelRatio, baseLevel = null, rawPastelRatio = null) {
-  // pastelRatio は raw g比率ではなく、通常色の染料支配力で圧縮した effectivePastel を渡す。
-  // 例：Blue 1 : Pastel 4 は raw 80% でも、Blueの色素支配を加味して effective は約56%に圧縮。
+  // Pastelは「Pastel色を混ぜる」のではなく、通常色の色相を残したまま
+  // Lvに応じて、彩度と明度だけをコントロールする。
+  // 低Lvは白化禁止、高Lvは実測傾向どおり淡く明るくなる余地を作る。
   const p = Math.max(0, Math.min(0.95, Number(pastelRatio) || 0));
   const rawP = Math.max(0, Math.min(0.95, Number(rawPastelRatio ?? pastelRatio) || 0));
   if (p <= 0 && rawP <= 0) return hex;
 
   const lv = getCurrentSpecialBaseLevel(baseLevel);
   const baseHex = baseLevelColors[String(lv)] || hex;
+  const dyeHsl = hexToHslForClear(hex);
+  const baseHsl = hexToHslForClear(baseHex);
+  if (!dyeHsl || !baseHsl) return hex;
+
   const visibility = getPastelVisibilityByLevel(lv);
 
-  // PastelはPastel色へ寄せない。色素濃度を下げて、ベースの見え方を少し増やすだけ。
-  // 低Lvは rawP も使って白化を防ぐ。高Lvは effective p を主体にしてVivid色相を残す。
-  const lowLevelBasePull = Math.max(p * 0.96, rawP * 0.55);
-  const highLevelBasePull = pastelCurveValue(p, [
+  // Vividの色素支配を残すため、raw比率をそのまま使わない。
+  // ただし高明度の淡さはraw比率も必要なので、effectiveとrawを混ぜて使う。
+  const lightInput = Math.max(0, Math.min(0.95, rawP * (0.84 + 0.16 * p)));
+  const satInput = Math.max(0, Math.min(0.95, rawP * (0.70 + 0.30 * p)));
+
+  const highLightMix = pastelCurveValue(lightInput, [
     [0.00, 0.00],
-    [0.15, 0.025],
-    [0.25, 0.045],
-    [0.33, 0.070],
-    [0.45, 0.105],
-    [0.55, 0.145],
-    [0.70, 0.220],
-    [0.85, 0.320],
-    [0.95, 0.400]
-  ]);
-  const midLevelBasePull = pastelCurveValue(p, [
-    [0.00, 0.00],
-    [0.15, 0.055],
-    [0.25, 0.090],
-    [0.33, 0.130],
-    [0.45, 0.200],
-    [0.55, 0.270],
-    [0.70, 0.390],
-    [0.85, 0.520],
-    [0.95, 0.620]
+    [0.20, 0.16],
+    [0.35, 0.29],
+    [0.50, 0.43],
+    [0.65, 0.57],
+    [0.80, 0.72],
+    [0.95, 0.84]
   ]);
 
-  let basePull;
+  const midLightMix = pastelCurveValue(lightInput, [
+    [0.00, 0.00],
+    [0.20, 0.06],
+    [0.35, 0.11],
+    [0.50, 0.18],
+    [0.65, 0.27],
+    [0.80, 0.38],
+    [0.95, 0.50]
+  ]);
+
+  // 低Lvは明度上昇させず、発色が弱くなる方向だけにする。
   if (lv <= 5) {
-    basePull = lowLevelBasePull;
-  } else {
-    basePull = midLevelBasePull * (1 - visibility) + highLevelBasePull * visibility;
+    const basePull = Math.max(p * 0.92, rawP * 0.42);
+    const pulled = mixHexForPastel(hex, baseHex, Math.max(0, Math.min(0.90, basePull)));
+    const pulledHsl = hexToHslForClear(pulled);
+    if (!pulledHsl) return pulled;
+    const lowSatDrop = pastelCurveValue(satInput, [
+      [0.00, 0.00], [0.30, 0.16], [0.55, 0.30], [0.80, 0.45], [0.95, 0.56]
+    ]);
+    const nextS = Math.max(0, Math.min(1, pulledHsl.s * (1 - lowSatDrop)));
+    const maxL = Math.max(dyeHsl.l, baseHsl.l + 0.015);
+    const nextL = Math.min(pulledHsl.l, maxL);
+    return hslToHexForClear(pulledHsl.h, nextS, nextL);
   }
-  basePull = Math.max(0, Math.min(0.92, basePull));
 
-  const diluted = mixHexForPastel(hex, baseHex, basePull);
-  const hsl = hexToHslForClear(diluted);
-  if (!hsl) return diluted;
+  const lightMix = midLightMix * (1 - visibility) + highLightMix * visibility;
+  const targetL = dyeHsl.l + (baseHsl.l - dyeHsl.l) * lightMix;
 
-  // 彩度もraw比率ではなくeffectiveで落とす。Pastel 3 : Vivid 1 でも色相主導権はVivid側に残す。
-  const satDropHigh = pastelCurveValue(p, [
+  // Pastelで白やグレーの色相へ寄せない。hueは通常色側を維持する。
+  const satDropHigh = pastelCurveValue(satInput, [
     [0.00, 0.00],
-    [0.15, 0.015],
-    [0.25, 0.030],
-    [0.33, 0.050],
-    [0.45, 0.080],
-    [0.55, 0.115],
-    [0.70, 0.180],
-    [0.85, 0.270],
-    [0.95, 0.350]
+    [0.20, 0.28],
+    [0.35, 0.45],
+    [0.50, 0.56],
+    [0.65, 0.63],
+    [0.80, 0.70],
+    [0.95, 0.76]
   ]);
-  const satDropLow = pastelCurveValue(p, [
+  const satDropMid = pastelCurveValue(satInput, [
     [0.00, 0.00],
-    [0.15, 0.040],
-    [0.25, 0.070],
-    [0.33, 0.100],
-    [0.45, 0.155],
-    [0.55, 0.210],
-    [0.70, 0.310],
-    [0.85, 0.430],
-    [0.95, 0.540]
+    [0.20, 0.30],
+    [0.35, 0.47],
+    [0.50, 0.58],
+    [0.65, 0.66],
+    [0.80, 0.74],
+    [0.95, 0.82]
   ]);
-  const satDrop = satDropLow * (1 - visibility) + satDropHigh * visibility;
-  const nextS = Math.max(0, Math.min(1, hsl.s * (1 - satDrop)));
-  const nextL = Math.max(0, Math.min(1, hsl.l)); // Pastelで明度を上げない
+  const satDrop = satDropMid * (1 - visibility) + satDropHigh * visibility;
 
-  // ここでPastelトーンHEXへmixしない。これがPastel寄り・白化の再発原因になる。
-  return hslToHexForClear(hsl.h, nextS, nextL);
+  const nextS = Math.max(0, Math.min(1, dyeHsl.s * (1 - satDrop)));
+  const nextL = Math.max(0, Math.min(1, targetL));
+
+  return hslToHexForClear(dyeHsl.h, nextS, nextL);
 }
 
 function applySpecialDilution(hex, ratios = getSpecialRatios(currentRecipe), baseLevel = null) {
