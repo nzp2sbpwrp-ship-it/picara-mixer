@@ -579,6 +579,33 @@
     margin-bottom: 8px;
   }
 
+
+  .base-type-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin: 12px 0 2px;
+  }
+
+  .base-type-btn {
+    border: 1px solid var(--border-color);
+    background: #fff;
+    color: var(--text-main);
+    border-radius: 999px;
+    padding: 9px 10px;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: background-color .15s ease, color .15s ease, border-color .15s ease, box-shadow .15s ease;
+  }
+
+  .base-type-btn.active {
+    background: var(--text-main);
+    color: #fff;
+    border-color: var(--text-main);
+    box-shadow: 0 4px 12px rgba(15,23,42,0.14);
+  }
+
   @media (max-width: 420px) {
     .compare-panel {
       grid-template-columns: 38% 62%;
@@ -840,6 +867,10 @@
     <div class="base-slider-row">
       <div class="base-slider-label">現在の髪の明るさ</div>
       <input type="range" id="baseRange" min="5" max="20" value="14" oninput="onBaseLevelChange(this.value)">
+      <div class="base-type-row" aria-label="ベースタイプ切替">
+        <button class="base-type-btn active" type="button" data-base-type="standard" onclick="setBaseType('standard')">標準ベース</button>
+        <button class="base-type-btn" type="button" data-base-type="orange" onclick="setBaseType('orange')">オレンジ茶ベース</button>
+      </div>
     </div>
   </div>
 
@@ -909,6 +940,10 @@
     <div class="photo-base-row">
       <input type="range" id="photoBaseRange" min="5" max="20" value="14" oninput="updatePhotoBaseLabel(this.value)">
       <div id="photoBaseBadge" class="photo-base-badge">Lv 14</div>
+    </div>
+    <div class="base-type-row" aria-label="ベースタイプ切替">
+      <button class="base-type-btn active" type="button" data-base-type="standard" onclick="setBaseType('standard')">標準ベース</button>
+      <button class="base-type-btn" type="button" data-base-type="orange" onclick="setBaseType('orange')">オレンジ茶ベース</button>
     </div>
   </div>
 
@@ -1027,6 +1062,9 @@ function setupPhotoTouchZoom() {
 // --- 💾 データグローバル保持 ---
 let picaraColors = {};
 let baseLevelColors = {};
+let standardBaseLevelColors = {};
+let orangeWarmBaseLevelColors = {};
+let selectedBaseType = "standard";
 let singleColorResults = {};
 let realMixDataSource = {}; // JSONから読み込むため、HTML内の直書きは完全排除可能
 
@@ -1038,6 +1076,7 @@ let uploadedImage = null;
 window.addEventListener("DOMContentLoaded", async () => {
   await loadPicaraData();
   renderPalette();
+  setBaseType("standard");
   updateBaseToneUI(14);
   updatePhotoBaseLabel(14);
   setupPhotoMagnifier();
@@ -1049,7 +1088,9 @@ async function loadPicaraData() {
     const rColors = await fetch("data/colors.json");
     const colorsData = await rColors.json();
     picaraColors = colorsData.picaraColors;
-    baseLevelColors = colorsData.baseLevelColors;
+    standardBaseLevelColors = colorsData.baseLevelColors || {};
+    orangeWarmBaseLevelColors = colorsData.orangeWarmBaseColors || colorsData.orangeWarmBaseLevelColors || standardBaseLevelColors;
+    baseLevelColors = standardBaseLevelColors;
 
     const rSingle = await fetch("data/singleColorResults.json");
     singleColorResults = await rSingle.json();
@@ -1203,6 +1244,28 @@ function renderRecipe() {
   });
 }
 
+// --- 🧱 ベースタイプ切替 ---
+function getActiveBaseTypeLabel() {
+  return selectedBaseType === "orange" ? "オレンジ茶" : "標準";
+}
+
+function setBaseType(type) {
+  selectedBaseType = type === "orange" ? "orange" : "standard";
+  baseLevelColors = selectedBaseType === "orange" ? orangeWarmBaseLevelColors : standardBaseLevelColors;
+
+  document.querySelectorAll(".base-type-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.baseType === selectedBaseType);
+  });
+
+  const baseRange = document.getElementById("baseRange");
+  if (baseRange) updateBaseToneUI(baseRange.value);
+
+  const photoRange = document.getElementById("photoBaseRange");
+  if (photoRange) updatePhotoBaseLabel(photoRange.value);
+
+  updateFinalOutput();
+}
+
 // --- 📏 レベル調整 ---
 function onBaseLevelChange(val) {
   const lv = normalizeBaseLevel(val);
@@ -1216,7 +1279,7 @@ function normalizeBaseLevel(val) {
 }
 
 function updateBaseToneUI(lv) {
-  document.getElementById("baseLevelText").textContent = Number(lv) <= 5 ? "黒髪" : `Lv ${lv}`;
+  document.getElementById("baseLevelText").textContent = Number(lv) <= 5 ? `黒髪 / ${getActiveBaseTypeLabel()}` : `Lv ${lv} / ${getActiveBaseTypeLabel()}`;
   const hex = baseLevelColors[String(lv)];
   if (hex) {
     const baseSwatch = document.getElementById("baseColorSwatch");
@@ -1438,7 +1501,8 @@ let latestPhotoTargetHex = null;
 
 function photoLevelLabel(lv) {
   const n = normalizeBaseLevel(lv);
-  return n <= 5 ? "黒髪" : `Lv ${n}`;
+  const lvLabel = n <= 5 ? "黒髪" : `Lv ${n}`;
+  return `${lvLabel} / ${getActiveBaseTypeLabel()}`;
 }
 
 function updatePhotoBaseLabel(val) {
