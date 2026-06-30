@@ -1881,7 +1881,7 @@ function getClearRatioFromRecipe() {
 }
 
 
-// ===== SPECIAL MODIFIER LOGIC - PASTEL CURVE VERIFIED =====
+// ===== SPECIAL MODIFIER LOGIC - PASTEL CURVE FULLCHECK V3 =====
 // Clear / 11BK / Pastel は通常色として混ぜない。
 // 通常色だけで色マスター軸の仕上がりを作り、最後に1回だけ特殊剤補正をかける。
 // 実測値は直採用せず、係数調整の勉強材料として扱う。
@@ -1975,7 +1975,7 @@ function mixHexForPastel(hexA, hexB, t) {
 }
 
 function interpolatePastelCurve(p, points) {
-  const ratio = Math.max(0, Math.min(0.95, Number(p) || 0));
+  const ratio = Math.max(0, Math.min(0.995, Number(p) || 0));
   if (!Array.isArray(points) || points.length === 0) return ratio;
   if (ratio <= points[0][0]) return points[0][1];
 
@@ -1993,7 +1993,7 @@ function interpolatePastelCurve(p, points) {
 }
 
 function pastelCurveValue(p, points) {
-  const ratio = Math.max(0, Math.min(0.95, Number(p) || 0));
+  const ratio = Math.max(0, Math.min(0.995, Number(p) || 0));
   if (!Array.isArray(points) || points.length === 0) return ratio;
   if (ratio <= points[0][0]) return points[0][1];
 
@@ -2022,8 +2022,8 @@ function mixHueCircularForPastel(h1, h2, t) {
 function applyPastelDilution(hex, pastelRatio, baseLevel = null, rawPastelRatio = null) {
   // Pastelは色として混ぜない。通常色の色相を主軸にして、濃度・彩度・明度だけをLv依存で変える。
   // 今回はBlue:Pastelの実測/写真に合わせ、1:1〜1:4は色相を残し、1:9〜1:20は一気に淡くする連続曲線。
-  const p = Math.max(0, Math.min(0.95, Number(pastelRatio) || 0));
-  const rawP = Math.max(0, Math.min(0.95, Number(rawPastelRatio ?? pastelRatio) || 0));
+  const p = Math.max(0, Math.min(0.995, Number(pastelRatio) || 0));
+  const rawP = Math.max(0, Math.min(0.995, Number(rawPastelRatio ?? pastelRatio) || 0));
   if (p <= 0 && rawP <= 0) return hex;
 
   const lv = getCurrentSpecialBaseLevel(baseLevel);
@@ -2042,42 +2042,64 @@ function applyPastelDilution(hex, pastelRatio, baseLevel = null, rawPastelRatio 
     if (!pulledHsl) return pulled;
     const lowSatDrop = pastelCurveValue(rawP, [
       [0.00, 0.00], [0.20, 0.05], [0.50, 0.16], [0.70, 0.27],
-      [0.80, 0.36], [0.90, 0.48], [0.95, 0.58]
+      [0.80, 0.36], [0.90, 0.48], [0.95, 0.58], [0.98, 0.68], [0.995, 0.76]
     ]);
     const nextS = Math.max(0, Math.min(1, pulledHsl.s * (1 - lowSatDrop)));
     const nextL = Math.min(pulledHsl.l, Math.max(dyeHsl.l, baseHsl.l + 0.01));
     return hslToHexForClear(pulledHsl.h, nextS, nextL);
   }
 
-  // 明度はraw Pastel比率で見る。effective寄りにしすぎると1:9/1:20でBlueが強く残りすぎる。
-  const highLightMix = pastelCurveValue(rawP, [
-    [0.00, 0.00], [0.20, 0.16], [0.35, 0.24], [0.50, 0.36],
-    [0.65, 0.56], [0.70, 0.64], [0.80, 0.72], [0.90, 0.86], [0.95, 0.96]
-  ]);
-  const midLightMix = pastelCurveValue(rawP, [
-    [0.00, 0.00], [0.20, 0.04], [0.35, 0.065], [0.50, 0.10],
-    [0.65, 0.15], [0.70, 0.18], [0.80, 0.27], [0.90, 0.42], [0.95, 0.55]
-  ]);
+  const hueDeg = (((dyeHsl.h * 360) % 360) + 360) % 360;
+  const isRedFamily = (hueDeg <= 25 || hueDeg >= 330);
+
+  // 明度はraw Pastel比率で見る。ただしBlue系は1:1〜1:4で白く抜けすぎないよう抑え、
+  // 1:9以降は淡いラベンダーグレーへ。Red系は実測のピンクベージュ方向に別カーブ。
+  const highLightMix = isRedFamily
+    ? pastelCurveValue(rawP, [
+        [0.00, 0.00], [0.20, 0.32], [0.35, 0.35], [0.50, 0.39],
+        [0.65, 0.48], [0.70, 0.54], [0.80, 0.66], [0.90, 0.78], [0.95, 0.88], [0.98, 0.94], [0.995, 0.985]
+      ])
+    : pastelCurveValue(rawP, [
+        [0.00, 0.00], [0.20, 0.16], [0.35, 0.24], [0.50, 0.36],
+        [0.65, 0.52], [0.70, 0.62], [0.80, 0.66], [0.90, 0.86], [0.95, 0.96], [0.98, 0.985], [0.995, 0.998]
+      ]);
+  const midLightMix = isRedFamily
+    ? pastelCurveValue(rawP, [
+        [0.00, 0.00], [0.20, 0.10], [0.35, 0.12], [0.50, 0.16],
+        [0.65, 0.24], [0.70, 0.29], [0.80, 0.38], [0.90, 0.50], [0.95, 0.62], [0.98, 0.74], [0.995, 0.86]
+      ])
+    : pastelCurveValue(rawP, [
+        [0.00, 0.00], [0.20, 0.04], [0.35, 0.065], [0.50, 0.10],
+        [0.65, 0.15], [0.70, 0.18], [0.80, 0.24], [0.90, 0.42], [0.95, 0.55], [0.98, 0.68], [0.995, 0.80]
+      ]);
   const lightMix = midLightMix * (1 - visibility) + highLightMix * visibility;
   const targetL = dyeHsl.l + (baseHsl.l - dyeHsl.l) * lightMix;
 
-  // 彩度もraw比率で連続的に落とす。80%までは色味を残し、90%以降は明確に弱める。
-  const satDropHigh = pastelCurveValue(rawP, [
-    [0.00, 0.00], [0.20, 0.15], [0.35, 0.34], [0.50, 0.55],
-    [0.65, 0.57], [0.70, 0.58], [0.80, 0.66], [0.90, 0.76], [0.95, 0.90]
-  ]);
-  const satDropMid = pastelCurveValue(rawP, [
-    [0.00, 0.00], [0.20, 0.18], [0.35, 0.39], [0.50, 0.60],
-    [0.65, 0.65], [0.70, 0.67], [0.80, 0.75], [0.90, 0.86], [0.95, 0.94]
-  ]);
+  // Blue系は90%でも青紫ニュアンスを残す。Red系は高Pastelでグレーに落とさず、ローズ〜ピンクベージュに残す。
+  const satDropHigh = isRedFamily
+    ? pastelCurveValue(rawP, [
+        [0.00, 0.00], [0.20, 0.23], [0.35, 0.28], [0.50, 0.32],
+        [0.65, 0.28], [0.70, 0.22], [0.80, 0.12], [0.90, 0.00], [0.95, 0.00], [0.98, 0.04], [0.995, 0.10]
+      ])
+    : pastelCurveValue(rawP, [
+        [0.00, 0.00], [0.20, 0.15], [0.35, 0.34], [0.50, 0.55],
+        [0.65, 0.56], [0.70, 0.57], [0.80, 0.58], [0.90, 0.67], [0.95, 0.82], [0.98, 0.92], [0.995, 0.97]
+      ]);
+  const satDropMid = isRedFamily
+    ? pastelCurveValue(rawP, [
+        [0.00, 0.00], [0.20, 0.28], [0.35, 0.34], [0.50, 0.40],
+        [0.65, 0.36], [0.70, 0.31], [0.80, 0.22], [0.90, 0.10], [0.95, 0.05], [0.98, 0.06], [0.995, 0.10]
+      ])
+    : pastelCurveValue(rawP, [
+        [0.00, 0.00], [0.20, 0.18], [0.35, 0.39], [0.50, 0.60],
+        [0.65, 0.64], [0.70, 0.66], [0.80, 0.68], [0.90, 0.78], [0.95, 0.88], [0.98, 0.94], [0.995, 0.98]
+      ]);
   const satDrop = satDropMid * (1 - visibility) + satDropHigh * visibility;
 
   let nextH = dyeHsl.h;
-  // Red系だけ、高Pastel時にほんの少し暖色ベース側へ回す。Blue系には入れない。
-  const hueDeg = (((dyeHsl.h * 360) % 360) + 360) % 360;
-  if ((hueDeg <= 25 || hueDeg >= 330) && rawP >= 0.55) {
+  if (isRedFamily && rawP >= 0.55) {
     const warmShift = pastelCurveValue(rawP, [
-      [0.55, 0.00], [0.70, 0.10], [0.80, 0.22], [0.90, 0.42], [0.95, 0.55]
+      [0.55, 0.00], [0.70, 0.14], [0.80, 0.34], [0.90, 0.72], [0.95, 0.82], [0.98, 0.90], [0.995, 0.96]
     ]) * visibility;
     nextH = mixHueCircularForPastel(dyeHsl.h, 0.03, warmShift);
   }
@@ -2113,7 +2135,7 @@ function getSpecialDilutionSourceSuffix(ratios = getSpecialRatios(currentRecipe)
 function calculateBaseResultExcludingSpecial(lv, totalGram, recipe = currentRecipe) {
   return calculateHairResult(lv, totalGram, getNormalRecipeOnly(recipe));
 }
-// ===== END SPECIAL MODIFIER LOGIC - PASTEL CURVE VERIFIED =====
+// ===== END SPECIAL MODIFIER LOGIC - PASTEL CURVE FULLCHECK V3 =====
 
 
 function hexToRgb(hex) { return hexToRgbLocal(hex); }
