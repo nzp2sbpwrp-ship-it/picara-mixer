@@ -1881,7 +1881,7 @@ function getClearRatioFromRecipe() {
 }
 
 
-// ===== SPECIAL MODIFIER LOGIC - PASTEL CURVE RETHINK =====
+// ===== SPECIAL MODIFIER LOGIC - PASTEL CURVE VERIFIED =====
 // Clear / 11BK / Pastel は通常色として混ぜない。
 // 通常色だけで色マスター軸の仕上がりを作り、最後に1回だけ特殊剤補正をかける。
 // 実測値は直採用せず、係数調整の勉強材料として扱う。
@@ -2009,10 +2009,19 @@ function pastelCurveValue(p, points) {
   return points[points.length - 1][1];
 }
 
+function mixHueCircularForPastel(h1, h2, t) {
+  const ratio = Math.max(0, Math.min(1, Number(t) || 0));
+  let a = ((Number(h1) || 0) % 1 + 1) % 1;
+  let b = ((Number(h2) || 0) % 1 + 1) % 1;
+  let d = b - a;
+  if (d > 0.5) d -= 1;
+  if (d < -0.5) d += 1;
+  return ((a + d * ratio) % 1 + 1) % 1;
+}
+
 function applyPastelDilution(hex, pastelRatio, baseLevel = null, rawPastelRatio = null) {
-  // Pastelは「白を混ぜる剤」ではなく、色素濃度と透明感を下げる媒体。
-  // 重要なのは、Pastel高配合でも色相の主導権は通常色側に残すこと。
-  // ただし90%前後からは急に淡くなっていく実測傾向も残す。
+  // Pastelは色として混ぜない。通常色の色相を主軸にして、濃度・彩度・明度だけをLv依存で変える。
+  // 今回はBlue:Pastelの実測/写真に合わせ、1:1〜1:4は色相を残し、1:9〜1:20は一気に淡くする連続曲線。
   const p = Math.max(0, Math.min(0.95, Number(pastelRatio) || 0));
   const rawP = Math.max(0, Math.min(0.95, Number(rawPastelRatio ?? pastelRatio) || 0));
   if (p <= 0 && rawP <= 0) return hex;
@@ -2025,54 +2034,58 @@ function applyPastelDilution(hex, pastelRatio, baseLevel = null, rawPastelRatio 
 
   const visibility = getPastelVisibilityByLevel(lv);
 
-  // raw比率だけで曲線を回すと、1:1や3:1でもPastelが効きすぎる。
-  // 通常色の染料支配を反映したeffective値を主軸にし、raw比率は高Pastel域の補助にだけ使う。
-  const densityInput = Math.max(0, Math.min(0.95, p * 0.82 + rawP * 0.18));
-  const lightInput = Math.max(0, Math.min(0.95, p * 0.68 + rawP * 0.32));
-
-  // 低Lvは白化禁止。Pastelで明度を上げず、ベース側に戻しつつ彩度だけ少し落とす。
+  // 低Lvは白化禁止。Pastelが多いほど発色は弱まるが、明度は上げない。
   if (lv <= 5) {
-    const basePull = Math.max(p * 0.84, rawP * 0.30);
+    const basePull = Math.max(p * 0.82, rawP * 0.34);
     const pulled = mixHexForPastel(hex, baseHex, Math.max(0, Math.min(0.88, basePull)));
     const pulledHsl = hexToHslForClear(pulled);
     if (!pulledHsl) return pulled;
-    const lowSatDrop = pastelCurveValue(densityInput, [
-      [0.00, 0.00], [0.20, 0.05], [0.35, 0.10], [0.50, 0.16],
-      [0.65, 0.24], [0.80, 0.34], [0.90, 0.42], [0.95, 0.48]
+    const lowSatDrop = pastelCurveValue(rawP, [
+      [0.00, 0.00], [0.20, 0.05], [0.50, 0.16], [0.70, 0.27],
+      [0.80, 0.36], [0.90, 0.48], [0.95, 0.58]
     ]);
     const nextS = Math.max(0, Math.min(1, pulledHsl.s * (1 - lowSatDrop)));
     const nextL = Math.min(pulledHsl.l, Math.max(dyeHsl.l, baseHsl.l + 0.01));
     return hslToHexForClear(pulledHsl.h, nextS, nextL);
   }
 
-  // 高明度ほどPastelの淡さは見えやすいが、50%前後ではまだ通常色がかなり残る。
-  const highLightMix = pastelCurveValue(lightInput, [
-    [0.00, 0.00], [0.15, 0.03], [0.25, 0.06], [0.35, 0.10],
-    [0.50, 0.18], [0.65, 0.28], [0.80, 0.42], [0.90, 0.52], [0.95, 0.60]
+  // 明度はraw Pastel比率で見る。effective寄りにしすぎると1:9/1:20でBlueが強く残りすぎる。
+  const highLightMix = pastelCurveValue(rawP, [
+    [0.00, 0.00], [0.20, 0.16], [0.35, 0.24], [0.50, 0.36],
+    [0.65, 0.56], [0.70, 0.64], [0.80, 0.72], [0.90, 0.86], [0.95, 0.96]
   ]);
-  const midLightMix = pastelCurveValue(lightInput, [
-    [0.00, 0.00], [0.15, 0.01], [0.25, 0.02], [0.35, 0.04],
-    [0.50, 0.07], [0.65, 0.12], [0.80, 0.18], [0.90, 0.25], [0.95, 0.31]
+  const midLightMix = pastelCurveValue(rawP, [
+    [0.00, 0.00], [0.20, 0.04], [0.35, 0.065], [0.50, 0.10],
+    [0.65, 0.15], [0.70, 0.18], [0.80, 0.27], [0.90, 0.42], [0.95, 0.55]
   ]);
   const lightMix = midLightMix * (1 - visibility) + highLightMix * visibility;
   const targetL = dyeHsl.l + (baseHsl.l - dyeHsl.l) * lightMix;
 
-  // 彩度低下も同様に弱める。1:1や3:1で薄くなりすぎないようにしつつ、
-  // 1:9 / 20:1 ではしっかり淡くなるよう後半だけ曲率を上げる。
-  const satDropHigh = pastelCurveValue(densityInput, [
-    [0.00, 0.00], [0.15, 0.04], [0.25, 0.08], [0.35, 0.13],
-    [0.50, 0.20], [0.65, 0.30], [0.80, 0.42], [0.90, 0.54], [0.95, 0.62]
+  // 彩度もraw比率で連続的に落とす。80%までは色味を残し、90%以降は明確に弱める。
+  const satDropHigh = pastelCurveValue(rawP, [
+    [0.00, 0.00], [0.20, 0.15], [0.35, 0.34], [0.50, 0.55],
+    [0.65, 0.57], [0.70, 0.58], [0.80, 0.66], [0.90, 0.76], [0.95, 0.90]
   ]);
-  const satDropMid = pastelCurveValue(densityInput, [
-    [0.00, 0.00], [0.15, 0.05], [0.25, 0.10], [0.35, 0.16],
-    [0.50, 0.24], [0.65, 0.35], [0.80, 0.48], [0.90, 0.60], [0.95, 0.68]
+  const satDropMid = pastelCurveValue(rawP, [
+    [0.00, 0.00], [0.20, 0.18], [0.35, 0.39], [0.50, 0.60],
+    [0.65, 0.65], [0.70, 0.67], [0.80, 0.75], [0.90, 0.86], [0.95, 0.94]
   ]);
   const satDrop = satDropMid * (1 - visibility) + satDropHigh * visibility;
+
+  let nextH = dyeHsl.h;
+  // Red系だけ、高Pastel時にほんの少し暖色ベース側へ回す。Blue系には入れない。
+  const hueDeg = (((dyeHsl.h * 360) % 360) + 360) % 360;
+  if ((hueDeg <= 25 || hueDeg >= 330) && rawP >= 0.55) {
+    const warmShift = pastelCurveValue(rawP, [
+      [0.55, 0.00], [0.70, 0.10], [0.80, 0.22], [0.90, 0.42], [0.95, 0.55]
+    ]) * visibility;
+    nextH = mixHueCircularForPastel(dyeHsl.h, 0.03, warmShift);
+  }
 
   const nextS = Math.max(0, Math.min(1, dyeHsl.s * (1 - satDrop)));
   const nextL = Math.max(0, Math.min(1, targetL));
 
-  return hslToHexForClear(dyeHsl.h, nextS, nextL);
+  return hslToHexForClear(nextH, nextS, nextL);
 }
 
 function applySpecialDilution(hex, ratios = getSpecialRatios(currentRecipe), baseLevel = null) {
@@ -2100,7 +2113,7 @@ function getSpecialDilutionSourceSuffix(ratios = getSpecialRatios(currentRecipe)
 function calculateBaseResultExcludingSpecial(lv, totalGram, recipe = currentRecipe) {
   return calculateHairResult(lv, totalGram, getNormalRecipeOnly(recipe));
 }
-// ===== END SPECIAL MODIFIER LOGIC - PASTEL CURVE RETHINK =====
+// ===== END SPECIAL MODIFIER LOGIC - PASTEL CURVE VERIFIED =====
 
 
 function hexToRgb(hex) { return hexToRgbLocal(hex); }
