@@ -221,6 +221,33 @@
     font-family: -apple-system-font, "SF Pro Text", monospace;
     font-variant-numeric: tabular-nums;
   }
+  .gram-stepper {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .gram-step-btn {
+    width: 28px;
+    height: 22px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: #ffffff;
+    color: var(--text-main);
+    font-size: 13px;
+    line-height: 1;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .gram-step-btn:active {
+    background: #e2e8f0;
+    transform: translateY(1px);
+  }
 
   /* 出力結果グリッドの等幅フォント化 */
   .output-grid {
@@ -741,7 +768,7 @@
 
 
   /* Photo Finder: ボタン式ズーム廃止。ピンチズーム＋スクロール移動用 */
-  #photoStage {
+  #photoStage, #canvasContainer {
     overflow: auto !important;
     max-height: 68vh;
     -webkit-overflow-scrolling: touch;
@@ -941,7 +968,8 @@
       <input type="range" id="photoBaseRange" min="5" max="20" value="14" oninput="updatePhotoBaseLabel(this.value)">
       <div id="photoBaseBadge" class="photo-base-badge">Lv 14</div>
     </div>
-    <div class="base-type-row" aria-label="ベースタイプ切替">
+    <div class="base-slider-label" style="margin-top:10px; margin-bottom:6px;">ベースタイプ</div>
+    <div class="base-type-row" aria-label="写真解析ベースタイプ切替">
       <button class="base-type-btn active" type="button" data-base-type="standard" onclick="setBaseType('standard')">標準ベース</button>
       <button class="base-type-btn" type="button" data-base-type="orange" onclick="setBaseType('orange')">オレンジ茶ベース</button>
     </div>
@@ -987,6 +1015,18 @@ let photoTouchState = {
   lastTapTime: 0
 };
 
+let photoTouchPickState = {
+  active: false,
+  picking: false,
+  startX: 0,
+  startY: 0,
+  lastX: 0,
+  lastY: 0,
+  startTime: 0,
+  timer: null,
+  lastSampleAt: 0
+};
+
 function getTouchDistance(touches) {
   const dx = touches[0].clientX - touches[1].clientX;
   const dy = touches[0].clientY - touches[1].clientY;
@@ -995,7 +1035,7 @@ function getTouchDistance(touches) {
 
 function applyPhotoTouchZoom(scale) {
   const canvas = document.getElementById("photoCanvas");
-  const stage = document.getElementById("photoStage");
+  const stage = document.getElementById("photoStage") || document.getElementById("canvasContainer");
   if (!canvas || !stage) return;
 
   photoTouchState.scale = Math.max(1, Math.min(4, scale));
@@ -1006,7 +1046,7 @@ function applyPhotoTouchZoom(scale) {
 }
 
 function resetPhotoTouchZoom() {
-  const stage = document.getElementById("photoStage");
+  const stage = document.getElementById("photoStage") || document.getElementById("canvasContainer");
   applyPhotoTouchZoom(1);
   if (stage) {
     stage.scrollLeft = 0;
@@ -1015,7 +1055,7 @@ function resetPhotoTouchZoom() {
 }
 
 function setupPhotoTouchZoom() {
-  const stage = document.getElementById("photoStage");
+  const stage = document.getElementById("photoStage") || document.getElementById("canvasContainer");
   const canvas = document.getElementById("photoCanvas");
   if (!stage || !canvas || stage.dataset.touchZoomReady === "1") return;
   stage.dataset.touchZoomReady = "1";
@@ -1185,6 +1225,67 @@ function addColorToRecipe(name) {
   }
 }
 
+
+function normalizeGramValue(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.round(n * 10) / 10);
+}
+
+function setRecipeGram(index, value, inputEl = null) {
+  if (!currentRecipe[index]) return;
+  const next = normalizeGramValue(value);
+  currentRecipe[index].gram = next;
+  if (inputEl) inputEl.value = String(next);
+  updateFinalOutput();
+}
+
+function makeGramStepButton(label, delta, index, inputEl) {
+  const btn = document.createElement("button");
+  btn.className = "gram-step-btn";
+  btn.type = "button";
+  btn.textContent = label;
+  btn.setAttribute("aria-label", delta > 0 ? "量を増やす" : "量を減らす");
+
+  let holdTimer = null;
+  let repeatTimer = null;
+  let speedTimer = null;
+  let step = Math.abs(delta);
+
+  const clearTimers = () => {
+    if (holdTimer) clearTimeout(holdTimer);
+    if (repeatTimer) clearInterval(repeatTimer);
+    if (speedTimer) clearTimeout(speedTimer);
+    holdTimer = null;
+    repeatTimer = null;
+    speedTimer = null;
+    step = Math.abs(delta);
+  };
+
+  const changeOnce = (amount = delta) => {
+    if (!currentRecipe[index]) return;
+    setRecipeGram(index, (Number(currentRecipe[index].gram) || 0) + amount, inputEl);
+  };
+
+  const startHold = (event) => {
+    event.preventDefault();
+    btn.setPointerCapture?.(event.pointerId);
+    changeOnce(delta);
+    clearTimers();
+    holdTimer = setTimeout(() => {
+      repeatTimer = setInterval(() => changeOnce(delta > 0 ? step : -step), 85);
+      speedTimer = setTimeout(() => { step = Math.abs(delta) * 5; }, 900);
+    }, 280);
+  };
+
+  btn.addEventListener("pointerdown", startHold);
+  ["pointerup", "pointercancel", "pointerleave", "lostpointercapture"].forEach(type => {
+    btn.addEventListener(type, clearTimers);
+  });
+
+  return btn;
+}
+
 function renderRecipe() {
   const container = document.getElementById("recipeContainer");
   container.innerHTML = "";
@@ -1214,10 +1315,16 @@ function renderRecipe() {
     input.type = "number";
     input.value = item.gram;
     input.min = "0";
+    input.inputMode = "decimal";
+    input.step = "1";
     input.oninput = (e) => {
-      currentRecipe[index].gram = parseFloat(e.target.value) || 0;
-      updateFinalOutput();
+      setRecipeGram(index, e.target.value, input);
     };
+
+    const stepper = document.createElement("div");
+    stepper.className = "gram-stepper";
+    stepper.appendChild(makeGramStepButton("▲", 1, index, input));
+    stepper.appendChild(makeGramStepButton("▼", -1, index, input));
 
     const unit = document.createElement("span");
     unit.textContent = "g";
@@ -1235,6 +1342,7 @@ function renderRecipe() {
     };
 
     right.appendChild(input);
+    right.appendChild(stepper);
     right.appendChild(unit);
     right.appendChild(del);
 
@@ -1276,6 +1384,42 @@ function onBaseLevelChange(val) {
 function normalizeBaseLevel(val) {
   const lv = parseInt(val, 10);
   return lv <= 5 ? 5 : lv;
+}
+
+function getBaseHexByType(type, lv) {
+  const level = normalizeBaseLevel(lv);
+  const source = type === "orange" ? orangeWarmBaseLevelColors : standardBaseLevelColors;
+  return (source && source[String(level)]) || null;
+}
+
+function applySelectedBaseToneInfluence(hex, lv) {
+  // 色マスター単品表は標準ベース基準なので、オレンジ茶ベース選択時だけ
+  // 標準ベースとの差分をオンカラー後にも反映する。実測直採用ではなく連続補正。
+  if (selectedBaseType !== "orange") return hex;
+
+  const level = normalizeBaseLevel(lv);
+  const standardHex = getBaseHexByType("standard", level);
+  const orangeHex = getBaseHexByType("orange", level);
+  const resultRgb = hexToRgbLocal(hex);
+  const standardRgb = hexToRgbLocal(standardHex);
+  const orangeRgb = hexToRgbLocal(orangeHex);
+  if (!resultRgb || !standardRgb || !orangeRgb) return hex;
+
+  const visibility = Math.max(0.16, Math.min(0.55, (level - 4) / 30));
+  const dr = (orangeRgb.r - standardRgb.r) * visibility;
+  const dg = (orangeRgb.g - standardRgb.g) * visibility;
+  const db = (orangeRgb.b - standardRgb.b) * visibility;
+
+  const shifted = rgbToHex(
+    resultRgb.r + dr,
+    resultRgb.g + dg,
+    resultRgb.b + db
+  );
+
+  // オレンジ茶ベースは単なるRGB差分だけだと暖かさが見えにくいので、
+  // 高Lvほどごく薄くベース色を透かす。Clear/Pastel/11BKはこの後にかかる。
+  const baseSheer = Math.max(0.00, Math.min(0.10, (level - 8) / 160));
+  return baseSheer > 0 ? mixHexColorsForGradient(shifted, orangeHex, baseSheer) : shifted;
 }
 
 function updateBaseToneUI(lv) {
@@ -1450,17 +1594,18 @@ function calculateHairResult(lv, totalGram, recipe = currentRecipe) {
   if (dyeActive.length === 1) {
     const singleName = dyeActive[0].name;
     if (singleColorResults[singleName] && singleColorResults[singleName][level - 1]) {
+      const baseAdjustedHex = applySelectedBaseToneInfluence(singleColorResults[singleName][level - 1], level);
       return {
-        hex: applySpecialDilution(singleColorResults[singleName][level - 1], specialRatios, level),
-        source: "色マスター単品" + getSpecialDilutionSourceSuffix(specialRatios)
+        hex: applySpecialDilution(baseAdjustedHex, specialRatios, level),
+        source: "色マスター単品" + (selectedBaseType === "orange" ? " / オレンジ茶ベース補正" : "") + getSpecialDilutionSourceSuffix(specialRatios)
       };
     }
   }
 
-  const blendedHex = blendColorsByWeight(level, dyeActive);
+  const blendedHex = applySelectedBaseToneInfluence(blendColorsByWeight(level, dyeActive), level);
   return {
     hex: applySpecialDilution(blendedHex, specialRatios, level),
-    source: "色マスター推定・重み付け演算" + getSpecialDilutionSourceSuffix(specialRatios)
+    source: "色マスター推定・重み付け演算" + (selectedBaseType === "orange" ? " / オレンジ茶ベース補正" : "") + getSpecialDilutionSourceSuffix(specialRatios)
   };
 }
 
@@ -1712,33 +1857,111 @@ function drawPhotoMagnifier(clientX, clientY) {
   magnifier.style.top = `${Math.max(8, top)}px`;
 }
 
+function clearPhotoTouchPickTimer() {
+  if (photoTouchPickState.timer) {
+    clearTimeout(photoTouchPickState.timer);
+    photoTouchPickState.timer = null;
+  }
+}
+
 function setupPhotoMagnifier() {
   const canvas = document.getElementById("photoCanvas");
   if (!canvas || canvas.dataset.magnifierReady === "1") return;
   canvas.dataset.magnifierReady = "1";
 
-  canvas.addEventListener("pointerenter", (event) => drawPhotoMagnifier(event.clientX, event.clientY));
-  canvas.addEventListener("pointermove", (event) => drawPhotoMagnifier(event.clientX, event.clientY));
-  canvas.addEventListener("pointerdown", (event) => drawPhotoMagnifier(event.clientX, event.clientY));
-  canvas.addEventListener("pointerup", hidePhotoMagnifier);
+  canvas.addEventListener("pointerenter", (event) => {
+    if (event.pointerType !== "touch") drawPhotoMagnifier(event.clientX, event.clientY);
+  });
+  canvas.addEventListener("pointermove", (event) => {
+    if (event.pointerType !== "touch") drawPhotoMagnifier(event.clientX, event.clientY);
+  });
+  canvas.addEventListener("pointerdown", (event) => {
+    if (event.pointerType !== "touch") drawPhotoMagnifier(event.clientX, event.clientY);
+  });
+  canvas.addEventListener("pointerup", (event) => {
+    if (event.pointerType !== "touch") hidePhotoMagnifier();
+  });
   canvas.addEventListener("pointercancel", hidePhotoMagnifier);
-  canvas.addEventListener("pointerleave", hidePhotoMagnifier);
+  canvas.addEventListener("pointerleave", (event) => {
+    if (event.pointerType !== "touch") hidePhotoMagnifier();
+  });
+
+  // スマホ用：長押し中は虫眼鏡を出し、指を離した位置で色を抽出する。
+  canvas.addEventListener("touchstart", (event) => {
+    if (!uploadedImage || event.touches.length !== 1) return;
+    const t = event.touches[0];
+    clearPhotoTouchPickTimer();
+    photoTouchPickState.active = true;
+    photoTouchPickState.picking = false;
+    photoTouchPickState.startX = t.clientX;
+    photoTouchPickState.startY = t.clientY;
+    photoTouchPickState.lastX = t.clientX;
+    photoTouchPickState.lastY = t.clientY;
+    photoTouchPickState.startTime = Date.now();
+    drawPhotoMagnifier(t.clientX, t.clientY);
+    photoTouchPickState.timer = setTimeout(() => {
+      if (!photoTouchPickState.active) return;
+      photoTouchPickState.picking = true;
+      drawPhotoMagnifier(photoTouchPickState.lastX, photoTouchPickState.lastY);
+    }, 280);
+  }, { passive: true });
+
+  canvas.addEventListener("touchmove", (event) => {
+    if (!photoTouchPickState.active || event.touches.length !== 1) return;
+    const t = event.touches[0];
+    photoTouchPickState.lastX = t.clientX;
+    photoTouchPickState.lastY = t.clientY;
+    drawPhotoMagnifier(t.clientX, t.clientY);
+    if (photoTouchPickState.picking) event.preventDefault();
+  }, { passive: false });
+
+  canvas.addEventListener("touchend", (event) => {
+    if (!photoTouchPickState.active) return;
+    const duration = Date.now() - photoTouchPickState.startTime;
+    const shouldSample = photoTouchPickState.picking || duration >= 320;
+    const x = photoTouchPickState.lastX;
+    const y = photoTouchPickState.lastY;
+    clearPhotoTouchPickTimer();
+    photoTouchPickState.active = false;
+    photoTouchPickState.picking = false;
+    hidePhotoMagnifier();
+    if (shouldSample && addPhotoPointFromClient(x, y)) {
+      photoTouchPickState.lastSampleAt = Date.now();
+      event.preventDefault();
+    }
+  }, { passive: false });
+
+  canvas.addEventListener("touchcancel", () => {
+    clearPhotoTouchPickTimer();
+    photoTouchPickState.active = false;
+    photoTouchPickState.picking = false;
+    hidePhotoMagnifier();
+  }, { passive: true });
+}
+
+function addPhotoPointFromClient(clientX, clientY) {
+  if (!uploadedImage) return false;
+
+  const canvas = document.getElementById("photoCanvas");
+  const point = getCanvasPointFromClient(clientX, clientY);
+  if (!canvas || !point) return false;
+
+  const ctx = canvas.getContext("2d");
+  const px = Math.max(0, Math.min(canvas.width - 1, Math.floor(point.imageX)));
+  const py = Math.max(0, Math.min(canvas.height - 1, Math.floor(point.imageY)));
+  const imgData = ctx.getImageData(px, py, 1, 1).data;
+
+  photoPoints.push({ x: point.imageX, y: point.imageY, r: imgData[0], g: imgData[1], b: imgData[2] });
+  renderMarker(point.cssX, point.cssY, imgData);
+  updatePhotoSummary();
+  return true;
 }
 
 function onCanvasClick(event) {
   if (!uploadedImage) return;
-
-  const canvas = document.getElementById("photoCanvas");
-  const point = getCanvasPointFromEvent(event);
-  if (!point) return;
-
-  const ctx = canvas.getContext("2d");
-  const imgData = ctx.getImageData(Math.floor(point.imageX), Math.floor(point.imageY), 1, 1).data;
-
-  photoPoints.push({ x: point.imageX, y: point.imageY, r: imgData[0], g: imgData[1], b: imgData[2] });
-  renderMarker(point.cssX, point.cssY, imgData);
-
-  updatePhotoSummary();
+  // スマホの長押し抽出後に発生する疑似clickで二重抽出しない。
+  if (Date.now() - (photoTouchPickState.lastSampleAt || 0) < 450) return;
+  addPhotoPointFromClient(event.clientX, event.clientY);
 }
 
 function renderMarker(clickX, clickY, imgData) {
