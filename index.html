@@ -1525,25 +1525,38 @@ function blendColorsByWeight(recipeItems, lv) {
 }
 
 /**
- * 4. 特殊剤（Clear / Pastel / 11BK）の連続減衰カーブ
+ * 実測データ解析に基づく特殊剤・連続減衰関数
+ * @param {number} ratio - 特殊剤の配合比率 (例: Clear:Red=4:1なら 0.8)
+ * @param {string} type - "Pastel", "Clear", "11BK" のいずれか
+ * @returns {number} 染料の残留率 (0.0 〜 1.0)
  */
 function getDilutionCurve(ratio, type) {
-  const x = Math.max(0, Math.min(0.995, ratio));
+  // 計算破綻を防ぐため、比率を 0.0 〜 0.999 にクリップ
+  const x = Math.max(0, Math.min(0.999, Number(ratio) || 0));
 
   if (type === "Pastel") {
-    const k = 0.65;
-    const n = 3.2;
-    return 1 - (Math.pow(x, n) / (Math.pow(x, n) + Math.pow(k, n)));
+    // 【Pastel】ヒル方程式モデル
+    // 実測傾向：70%まで粘り、85%〜90%で急激に崩壊するS字カーブ
+    const K = 0.85; // 変曲点（半減するポイント）
+    const n = 6.0;  // 粘り強度（急激さ）
+    return 1 - (Math.pow(x, n) / (Math.pow(x, n) + Math.pow(K, n)));
   }
 
   if (type === "Clear") {
-    return Math.pow(1 - x, 1.5);
+    // 【Clear】ベキ乗則モデル（強減衰）
+    // 実測傾向：素直に薄まるが、光の透過率により計算上の割り算より少し早く色が飛ぶ
+    const gamma = 1.35;
+    return Math.pow(1 - x, gamma);
   }
 
   if (type === "11BK") {
-    return Math.pow(1 - x, 1.1);
+    // 【11BK】ベキ乗則モデル（弱減衰・色素残留）
+    // 実測傾向：大きく薄めても、黒色染料の吸光度が残るため色が完全には飛ばない
+    const gamma = 0.85;
+    return Math.pow(1 - x, gamma);
   }
 
+  // 通常は起こらないがフォールバックとして線形減衰
   return 1 - x;
 }
 
