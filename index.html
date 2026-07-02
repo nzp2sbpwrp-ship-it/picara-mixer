@@ -1639,11 +1639,11 @@ function makeOnColorTenBandGradient(baseLv, totalGram, recipe = currentRecipe) {
   const hexMinus2 = getSafeResultHexForLevel(lv - 2, totalGram, recipe);
 
   return `linear-gradient(to bottom, 
-    ${hexPlus2} 0%, ${hexPlus2} 15%, 
-    ${hexPlus1} 15%, ${hexPlus1} 35%, 
-    ${hexBase} 35%, ${hexBase} 65%, 
-    ${hexMinus1} 65%, ${hexMinus1} 85%, 
-    ${hexMinus2} 85%, ${hexMinus2} 100%)`;
+    ${hexPlus2} 0%, ${hexPlus2} 10%, 
+    ${hexPlus1} 10%, ${hexPlus1} 25%, 
+    ${hexBase} 25%, ${hexBase} 75%, 
+    ${hexMinus1} 75%, ${hexMinus1} 90%, 
+    ${hexMinus2} 90%, ${hexMinus2} 100%)`;
 }
 
 function applyOnColorGradientToSwatch(el, baseLv, totalGram, recipe = currentRecipe) {
