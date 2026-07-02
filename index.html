@@ -7,9 +7,9 @@
 <meta name="googlebot" content="noindex, nofollow, noarchive">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="ピカラ Color Mixer">
+<meta name="apple-mobile-web-app-title" content="PiCoLoR mixer">
 <meta name="theme-color" content="#f4f6f9">
-<title>ピカラ 実測学習型ミキサー</title>
+<title>PiCoLoR mixer ピカラミキサー</title>
 <style>
   :root {
     --bg-main: #f4f6f9;
@@ -840,8 +840,8 @@
 <div id="homeScreen" class="active-home">
   <div class="landing-wrap">
     <div class="landing-head">
-      <div class="brand-logo">PiCoLoR</div>
-      <div class="brand-subtitle">Professional Hair Color Simulator</div>
+      <div class="brand-logo">PiCoLoR mixer</div>
+      <div class="brand-subtitle">ピカラミキサー</div>
       <div class="brand-line"></div>
       <div class="brand-copy">カラーを、もっと自由に。</div>
     </div>
@@ -1638,7 +1638,7 @@ function makeOnColorTenBandGradient(baseLv, totalGram, recipe = currentRecipe) {
   const hexMinus1 = getSafeResultHexForLevel(lv - 1, totalGram, recipe);
   const hexMinus2 = getSafeResultHexForLevel(lv - 2, totalGram, recipe);
 
-  return `linear-gradient(to right, 
+  return `linear-gradient(to bottom, 
     ${hexPlus2} 0%, ${hexPlus2} 15%, 
     ${hexPlus1} 15%, ${hexPlus1} 35%, 
     ${hexBase} 35%, ${hexBase} 65%, 
