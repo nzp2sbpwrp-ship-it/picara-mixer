@@ -1570,7 +1570,7 @@ function getSpecialRatios(recipe = currentRecipe) {
 /**
  * 6. 真の仕上がりシミュレーション（アンダーベース毛との吸光度重ね合わせ）
  */
-function calculateHairResult(lv, totalGram, recipe = currentRecipe) {
+function calculateHairResultRaw(lv, totalGram, recipe = currentRecipe) {
   const level = normalizeBaseLevel(lv);
   const baseHex = baseLevelColors[String(level)] || "#FFFFFF";
   const baseRgb = hexToRgbLocal(baseHex);
@@ -1611,6 +1611,240 @@ function calculateHairResult(lv, totalGram, recipe = currentRecipe) {
   if (spec.total > 0) sourceText += " (連続関数希釈)";
 
   return { hex: finalHex, source: sourceText };
+}
+
+
+// =============================================================================
+// 🧠 PiCoLoR AI v1：実測近傍補正AI（k近傍 + RGB補正ベクトル）
+// =============================================================================
+const AI_KNN_CORRECTION_ENABLED = true;
+let aiRealMixSamplesCache = null;
+let aiRealMixCacheBaseType = null;
+
+function clampByte(v) {
+  return Math.max(0, Math.min(255, Math.round(Number(v) || 0)));
+}
+
+function rgbDistance(a, b) {
+  if (!a || !b) return 999;
+  const dr = a.r - b.r;
+  const dg = a.g - b.g;
+  const db = a.b - b.b;
+  return Math.sqrt(dr * dr + dg * dg + db * db);
+}
+
+function getRecipeVectorForAI(recipe = currentRecipe) {
+  const vec = {};
+  const list = Array.isArray(recipe) ? recipe : [];
+  const total = list.reduce((sum, item) => sum + Math.max(0, Number(item.gram) || 0), 0);
+  if (total <= 0) return vec;
+  list.forEach(item => {
+    const g = Math.max(0, Number(item.gram) || 0);
+    if (g <= 0 || !item.name) return;
+    vec[item.name] = (vec[item.name] || 0) + (g / total);
+  });
+  return vec;
+}
+
+function recipeVectorDistanceForAI(a, b) {
+  const keys = new Set([...Object.keys(a || {}), ...Object.keys(b || {})]);
+  if (!keys.size) return 1;
+  let sum = 0;
+  keys.forEach(k => { sum += Math.abs(((a && a[k]) || 0) - ((b && b[k]) || 0)); });
+  // L1距離は最大2なので0〜1へ正規化
+  return Math.max(0, Math.min(1, sum / 2));
+}
+
+function getSpecialProfileForAI(recipe = currentRecipe) {
+  const spec = getSpecialRatios(recipe);
+  const total = spec.total || 0;
+  if (total <= 0) return { Clear: 0, Pastel: 0, "11BK": 0, totalSpecial: 0 };
+  return {
+    Clear: spec.clear / total,
+    Pastel: spec.pastel / total,
+    "11BK": spec.bk11 / total,
+    totalSpecial: (spec.clear + spec.pastel + spec.bk11) / total
+  };
+}
+
+function specialProfileDistanceForAI(a, b) {
+  return (
+    Math.abs((a.Clear || 0) - (b.Clear || 0)) +
+    Math.abs((a.Pastel || 0) - (b.Pastel || 0)) +
+    Math.abs((a["11BK"] || 0) - (b["11BK"] || 0)) +
+    Math.abs((a.totalSpecial || 0) - (b.totalSpecial || 0))
+  ) / 4;
+}
+
+function nearestBaseLevelFromHexForAI(hex) {
+  const rgb = hexToRgbLocal(hex);
+  if (!rgb) return 14;
+  let bestLv = 14;
+  let bestD = Infinity;
+  Object.entries(baseLevelColors || {}).forEach(([lv, baseHex]) => {
+    const brgb = hexToRgbLocal(baseHex);
+    const d = rgbDistance(rgb, brgb);
+    if (d < bestD) {
+      bestD = d;
+      bestLv = normalizeBaseLevel(lv);
+    }
+  });
+  return bestLv;
+}
+
+function parseRealMixKeyForAI(key) {
+  const parts = String(key || "").split("|");
+  if (parts.length < 3) return null;
+  const ratioText = parts[parts.length - 1];
+  const baseHex = parts[parts.length - 2];
+  const names = parts.slice(0, -2);
+  if (!/^#[0-9a-fA-F]{6}$/.test(baseHex)) return null;
+  const grams = String(ratioText).split(":").map(v => Number(v));
+  if (!grams.length || grams.some(v => !Number.isFinite(v) || v < 0)) return null;
+  if (grams.length !== names.length) {
+    // 単品データだけは Blue|#base|1 のような形を許可
+    if (!(names.length === 1 && grams.length === 1)) return null;
+  }
+  const recipe = names.map((name, i) => ({ name, gram: grams[i] || 0 })).filter(i => i.name && i.gram > 0);
+  if (!recipe.length) return null;
+  return { recipe, baseHex, ratioText };
+}
+
+function buildAIRealMixSamples() {
+  const source = realMixDataSource || {};
+  const samples = [];
+  Object.entries(source).forEach(([key, realHex]) => {
+    if (!/^#[0-9a-fA-F]{6}$/.test(String(realHex || ""))) return;
+    const parsed = parseRealMixKeyForAI(key);
+    if (!parsed) return;
+
+    const sampleLv = nearestBaseLevelFromHexForAI(parsed.baseHex);
+    const totalGram = parsed.recipe.reduce((sum, item) => sum + (Number(item.gram) || 0), 0);
+    const raw = calculateHairResultRaw(sampleLv, totalGram, parsed.recipe);
+    const rawRgb = hexToRgbLocal(raw && raw.hex);
+    const realRgb = hexToRgbLocal(realHex);
+    const baseRgb = hexToRgbLocal(parsed.baseHex);
+    if (!rawRgb || !realRgb || !baseRgb) return;
+
+    samples.push({
+      key,
+      realHex,
+      realRgb,
+      rawHex: raw.hex,
+      rawRgb,
+      baseHex: parsed.baseHex,
+      baseRgb,
+      lv: sampleLv,
+      recipe: parsed.recipe,
+      recipeVec: getRecipeVectorForAI(parsed.recipe),
+      specialProfile: getSpecialProfileForAI(parsed.recipe),
+      delta: {
+        r: realRgb.r - rawRgb.r,
+        g: realRgb.g - rawRgb.g,
+        b: realRgb.b - rawRgb.b
+      }
+    });
+  });
+  return samples;
+}
+
+function getAIRealMixSamples() {
+  const baseType = selectedBaseType || "standard";
+  if (!aiRealMixSamplesCache || aiRealMixCacheBaseType !== baseType) {
+    aiRealMixSamplesCache = buildAIRealMixSamples();
+    aiRealMixCacheBaseType = baseType;
+  }
+  return aiRealMixSamplesCache || [];
+}
+
+function getAICorrectionFromRealMixData(lv, recipe, rawHex, baseHex) {
+  if (!AI_KNN_CORRECTION_ENABLED) return null;
+  const list = Array.isArray(recipe) ? recipe : [];
+  const totalGram = list.reduce((sum, item) => sum + Math.max(0, Number(item.gram) || 0), 0);
+  const normalGram = list.filter(item => !isDilutionModifier(item.name)).reduce((sum, item) => sum + Math.max(0, Number(item.gram) || 0), 0);
+  if (totalGram <= 0 || normalGram <= 0) return null;
+
+  const rawRgb = hexToRgbLocal(rawHex);
+  const baseRgb = hexToRgbLocal(baseHex);
+  if (!rawRgb || !baseRgb) return null;
+
+  const samples = getAIRealMixSamples();
+  if (!samples.length) return null;
+
+  const targetVec = getRecipeVectorForAI(recipe);
+  const targetSpecial = getSpecialProfileForAI(recipe);
+  const scored = [];
+
+  samples.forEach(sample => {
+    const recipeDist = recipeVectorDistanceForAI(targetVec, sample.recipeVec);
+    const specialDist = specialProfileDistanceForAI(targetSpecial, sample.specialProfile);
+    const baseDist = Math.min(1, rgbDistance(baseRgb, sample.baseRgb) / 441.7);
+    const rawDist = Math.min(1, rgbDistance(rawRgb, sample.rawRgb) / 441.7);
+
+    // レシピ類似を最優先。ベース色と仮計算色は補助。
+    const score = recipeDist * 2.6 + specialDist * 1.2 + baseDist * 1.1 + rawDist * 0.6;
+    scored.push({ ...sample, score });
+  });
+
+  scored.sort((a, b) => a.score - b.score);
+  const nearest = scored.slice(0, 12).filter(s => s.score < 2.15);
+  if (!nearest.length) return null;
+
+  let wr = 0, wg = 0, wb = 0, wsum = 0;
+  nearest.forEach(s => {
+    const w = 1 / Math.pow(0.045 + s.score, 2);
+    wr += s.delta.r * w;
+    wg += s.delta.g * w;
+    wb += s.delta.b * w;
+    wsum += w;
+  });
+  if (wsum <= 0) return null;
+
+  const bestScore = nearest[0].score;
+  const avgScore = nearest.reduce((sum, s) => sum + s.score, 0) / nearest.length;
+  const confidence = Math.max(0, Math.min(1, 1 - (avgScore / 2.15)));
+
+  // 近い実測が少ない時は補正を弱める。過補正防止。
+  const strength = Math.max(0, Math.min(0.92, confidence * (nearest.length >= 5 ? 0.88 : 0.68)));
+
+  return {
+    delta: { r: wr / wsum, g: wg / wsum, b: wb / wsum },
+    strength,
+    confidence,
+    count: nearest.length,
+    bestScore,
+    nearestKeys: nearest.slice(0, 5).map(s => s.key)
+  };
+}
+
+function applyAICorrectionToHex(hex, correction) {
+  const rgb = hexToRgbLocal(hex);
+  if (!rgb || !correction || !correction.delta) return hex;
+  const s = correction.strength || 0;
+  return rgbToHex(
+    clampByte(rgb.r + correction.delta.r * s),
+    clampByte(rgb.g + correction.delta.g * s),
+    clampByte(rgb.b + correction.delta.b * s)
+  );
+}
+
+function calculateHairResult(lv, totalGram, recipe = currentRecipe) {
+  const level = normalizeBaseLevel(lv);
+  const raw = calculateHairResultRaw(level, totalGram, recipe);
+  if (!raw || !raw.hex) return raw;
+
+  const baseHex = baseLevelColors[String(level)] || "#FFFFFF";
+  const correction = getAICorrectionFromRealMixData(level, recipe, raw.hex, baseHex);
+  if (!correction || correction.strength <= 0.01) return raw;
+
+  const aiHex = applyAICorrectionToHex(raw.hex, correction);
+  const pct = Math.round((correction.confidence || 0) * 100);
+  return {
+    hex: aiHex,
+    source: `${raw.source} + AI実測補正 ${pct}% / ${correction.count}件`,
+    rawHex: raw.hex,
+    ai: correction
+  };
 }
 
 /**
