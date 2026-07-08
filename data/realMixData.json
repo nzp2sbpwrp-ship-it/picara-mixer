@@ -1502,5 +1502,20 @@
   "Red|9BR|#715645|7:3": "#7E5F5A",
   "Red|9BR|#4F3C33|7:3": "#573F3A",
   "ALT6|Green|Cyan|#514136|8:1:1": "#565349",
-  "ALT6|Green|Cyan|#58453D|8:1:1": "#6D5E55"
+  "ALT6|Green|Cyan|#58453D|8:1:1": "#6D5E55",
+  "Pastel|Blue|#9C7D50|1:1": "#28292C",
+  "Pastel|Blue|#B48D58|1:1": "#333135",
+  "Pastel|Blue|#DDE1D7|1:1": "#3C475C",
+  "Pastel|Blue|#C09B59|1:4": "#111730",
+  "Pastel|Blue|#EFEFE2|1:4": "#313B65",
+  "Pastel|Blue|Violet|#9C7D50|3:6:1": "#2D2C2F",
+  "Pastel|Blue|Violet|#EDEBDC|3:6:1": "#404157",
+  "Pastel|Blue|#C09B59|7:3": "#2C3141",
+  "Pastel|Blue|#EFEFE2|7:3": "#8A91B3",
+  "Pastel|Blue|#C09B59|9:1": "#646365",
+  "Pastel|Blue|#EFEFE2|9:1": "#BFBECD",
+  "Pastel|Gold|#FAFAEA|1:2": "#EDDD67",
+  "Pastel|Gold|#FAFAEA|9:1": "#F5EFB2",
+  "Pastel|Gold|#9A865E|1:2": "#AE954A",
+  "Pastel|Gold|#9A865E|9:1": "#BDA568"
 }
