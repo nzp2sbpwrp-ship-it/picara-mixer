@@ -951,7 +951,7 @@
       <button class="photo-small-btn" type="button" onclick="findPhotoRecipes()">レシピ検索</button>
     </div>
 
-    <p class="hint-text">💡 髪の中間部分を数か所タップしてください。赤ピン表示は使わず、選択点の平均色から現在の色混ぜ計算で近いレシピを探します。</p>
+    <p class="hint-text">💡 髪の中間部分を数か所タップしてください。色抽出だけを先に行い、「レシピ検索」を押した時だけ候補を計算します。</p>
 
     <div class="photo-summary">
       <div id="photoTargetSwatch" class="photo-summary-swatch"></div>
@@ -1567,6 +1567,35 @@ function getSpecialRatios(recipe = currentRecipe) {
   return { clear, bk11, pastel, total };
 }
 
+
+function smoothStep01(t) {
+  const x = Math.max(0, Math.min(1, Number(t) || 0));
+  return x * x * (3 - 2 * x);
+}
+
+function getNormalPresenceGate(recipe = currentRecipe) {
+  const list = Array.isArray(recipe) ? recipe : [];
+  const total = list.reduce((sum, item) => sum + Math.max(0, Number(item.gram) || 0), 0);
+  if (total <= 0) return { gate: 0, normalGram: 0, specialGram: 0, normalShare: 0 };
+
+  const normalGram = list
+    .filter(item => !isDilutionModifier(item.name))
+    .reduce((sum, item) => sum + Math.max(0, Number(item.gram) || 0), 0);
+  const specialGram = Math.max(0, total - normalGram);
+  const normalShare = normalGram / total;
+
+  if (normalGram <= 0) return { gate: 0, normalGram, specialGram, normalShare };
+  if (specialGram <= 0) return { gate: 1, normalGram, specialGram, normalShare };
+
+  // 実測がある最薄アンカーを「特殊剤:ビビッド = 9:1」= normalShare 10% として使う。
+  // 10%未満は 9:1 から0%へ外挿する。
+  // 例：1%なら9:1の約1/10、0.01%なら約1/1000。
+  // 以前の smoothStep(0〜20%) は少量域を潰しすぎて、400:1 が完全に無変化になっていた。
+  const anchorShare = 0.10;
+  const gate = Math.max(0, Math.min(1, normalShare / anchorShare));
+  return { gate, normalGram, specialGram, normalShare };
+}
+
 /**
  * 6. 真の仕上がりシミュレーション（アンダーベース毛との吸光度重ね合わせ）
  */
@@ -1576,6 +1605,14 @@ function calculateHairResultRaw(lv, totalGram, recipe = currentRecipe) {
   const baseRgb = hexToRgbLocal(baseHex);
 
   const normalRecipe = (Array.isArray(recipe) ? recipe : []).filter(item => (Number(item.gram) || 0) > 0 && !isDilutionModifier(item.name));
+  const presence = getNormalPresenceGate(recipe);
+  if (presence.normalGram <= 0) {
+    const specOnly = getSpecialRatios(recipe);
+    let sourceText = "物理減法混色モデル";
+    if (specOnly.total > 0) sourceText += " (特殊剤単品・ベース優先)";
+    return { hex: baseHex, source: sourceText };
+  }
+
   const dyeHex = blendColorsByWeight(normalRecipe, level);
   const dyeRgb = hexToRgbLocal(dyeHex);
 
@@ -1593,9 +1630,10 @@ function calculateHairResultRaw(lv, totalGram, recipe = currentRecipe) {
     if (spec.bk11 > 0)   dyeRemaining *= getDilutionCurve(spec.bk11 / spec.total, "11BK");
   }
 
-  dyeAbs.r *= dyeRemaining;
-  dyeAbs.g *= dyeRemaining;
-  dyeAbs.b *= dyeRemaining;
+  const lowGramGate = presence.gate;
+  dyeAbs.r *= dyeRemaining * lowGramGate;
+  dyeAbs.g *= dyeRemaining * lowGramGate;
+  dyeAbs.b *= dyeRemaining * lowGramGate;
 
   const K = 0.85;
   const finalAbs = {
@@ -1805,7 +1843,9 @@ function getAICorrectionFromRealMixData(lv, recipe, rawHex, baseHex) {
   const confidence = Math.max(0, Math.min(1, 1 - (avgScore / 2.15)));
 
   // 近い実測が少ない時は補正を弱める。過補正防止。
-  const strength = Math.max(0, Math.min(0.92, confidence * (nearest.length >= 5 ? 0.88 : 0.68)));
+  const presence = getNormalPresenceGate(recipe);
+  const continuityGate = presence.specialGram > 0 ? presence.gate : 1;
+  const strength = Math.max(0, Math.min(0.92, confidence * (nearest.length >= 5 ? 0.88 : 0.68) * continuityGate));
 
   return {
     delta: { r: wr / wsum, g: wg / wsum, b: wb / wsum },
@@ -1962,7 +2002,7 @@ function updatePhotoBaseLabel(val) {
     badge.style.color = getContrastingTextColor(baseHex);
   }
 
-  if (latestPhotoTargetHex) findPhotoRecipes();
+  // ベース変更時は色表示のみ更新。レシピ検索はボタンを押した時だけ実行する。
 }
 
 function handleImageUpload(event) {
@@ -2328,7 +2368,10 @@ function updatePhotoSummary() {
     </div>
   `;
 
-  if (photoPoints.length >= 1) findPhotoRecipes();
+  const reverseEl = document.getElementById("photoReverseResults");
+  if (reverseEl) {
+    reverseEl.innerHTML = '<p style="color:var(--text-sub); font-size:13px; margin:0;">抽出完了。「レシピ検索」を押すと候補を計算します。</p>';
+  }
 }
 
 function averagePhotoPoints(points) {
